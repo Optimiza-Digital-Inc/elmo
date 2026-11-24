@@ -1,7 +1,7 @@
 /** @jsxRuntime automatic */
 // The pragma keeps this file rendering under tsx (the brand-kit script), which
 // compiles it outside any tsconfig that sets the automatic JSX runtime.
-import { DEFAULT_APP_NAME, ELMO_BRAND_COLOR } from "@workspace/config/constants";
+import { ELMO_APP_NAME, ELMO_BRAND_COLOR } from "@workspace/config/constants";
 import type { ReactNode } from "react";
 
 export const ACCENT_COLORS = ["#2563eb", "#f4d35e", "#ee964b", "#f95738"];
@@ -184,16 +184,19 @@ export function OgLabel({ children }: { children: string }) {
 export interface OgHeaderOptions {
 	appName: string;
 	iconDataUri?: string;
+	wordmarkDataUri?: string;
 	/** Short context shown as a pill on the right, e.g. "Docs" or "Blog". */
 	label?: string;
 }
 
 /** Wordmark (or whitelabel icon + name) on the left, optional label pill on the right. */
-export function OgHeader({ appName, iconDataUri, label }: OgHeaderOptions) {
-	const isElmo = appName === DEFAULT_APP_NAME;
+export function OgHeader({ appName, iconDataUri, wordmarkDataUri, label }: OgHeaderOptions) {
+	const isElmo = appName === ELMO_APP_NAME;
 	return (
 		<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 60 }}>
-			{isElmo ? (
+			{wordmarkDataUri ? (
+				<img src={wordmarkDataUri} alt={appName} width={330} height={60} style={{ objectFit: "contain" }} />
+			) : isElmo ? (
 				<div style={{ fontFamily: WORDMARK, fontSize: 60, lineHeight: 1, color: ELMO_BRAND_COLOR }}>elmo</div>
 			) : (
 				<div style={{ display: "flex", alignItems: "center" }}>
@@ -225,13 +228,10 @@ function titleFontSize(title: string): number {
 	return 50;
 }
 
-export interface OgImageOptions {
-	appName: string;
+export interface OgImageOptions extends OgHeaderOptions {
 	title?: string;
 	description?: string;
 	accentColors?: string[];
-	iconDataUri?: string;
-	label?: string;
 	/** Site or app URL; only its host is shown, in the footer. */
 	url?: string;
 }
@@ -245,8 +245,17 @@ function hostOf(url: string | undefined): string | undefined {
 	}
 }
 
-export function renderOgImage({ appName, title, description, accentColors, iconDataUri, label, url }: OgImageOptions) {
-	const isElmo = appName === DEFAULT_APP_NAME;
+export function renderOgImage({
+	appName,
+	title,
+	description,
+	accentColors,
+	iconDataUri,
+	wordmarkDataUri,
+	label,
+	url,
+}: OgImageOptions) {
+	const isElmo = !wordmarkDataUri && appName === ELMO_APP_NAME;
 	const colors = isElmo ? ACCENT_COLORS : (accentColors?.filter(Boolean).slice(0, 4) ?? []);
 	const heading = title || DEFAULT_TAGLINE;
 	const fontSize = titleFontSize(heading);
@@ -254,7 +263,7 @@ export function renderOgImage({ appName, title, description, accentColors, iconD
 
 	return (
 		<OgFrame accentColors={colors} footer={hostOf(url)}>
-			<OgHeader appName={appName} iconDataUri={iconDataUri} label={label} />
+			<OgHeader appName={appName} iconDataUri={iconDataUri} wordmarkDataUri={wordmarkDataUri} label={label} />
 			<div
 				style={{
 					display: "flex",

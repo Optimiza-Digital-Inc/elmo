@@ -64,7 +64,7 @@ function ItemLabel({
 export function ProgressBarChart({
 	items,
 	colorMapping = {},
-	defaultColor = "#3b82f6",
+	defaultColor = "var(--brand)",
 	trackColor = "bg-primary/10",
 	barHeight = "h-2",
 	percentageMode = "max",

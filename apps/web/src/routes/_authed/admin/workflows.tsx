@@ -173,7 +173,7 @@ function QueueStatsCard({ stats, title }: { stats: QueueStats; title: string }) 
 				<div className="grid grid-cols-3 gap-4 text-sm">
 					<div title="Jobs waiting to be picked up by a worker">
 						<p className="text-muted-foreground">Created</p>
-						<p className="text-xl font-semibold text-blue-600">{stats.created}</p>
+						<p className="text-xl font-semibold text-primary">{stats.created}</p>
 					</div>
 					<div title="Jobs currently being processed">
 						<p className="text-muted-foreground">Active</p>
@@ -574,7 +574,7 @@ function BrandRow({
 																	</Badge>
 																)}
 																{prompt.jobStatus === "created" && (
-																	<Badge variant="secondary" className="bg-blue-100 text-blue-700">
+																	<Badge variant="secondary" className="bg-accent text-primary">
 																		Queued
 																	</Badge>
 																)}

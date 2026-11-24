@@ -432,15 +432,15 @@ function AdminDashboard() {
 					</CardHeader>
 					<CardContent className="p-0 pb-4">
 						<ChartContainer
-							config={{ count: { label: "Total Brands", color: "#3b82f6" } }}
+							config={{ count: { label: "Total Brands", color: "var(--brand)" } }}
 							className="h-[120px] w-full px-4"
 						>
 							<ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
 								<AreaChart data={brandsOverTime}>
 									<defs>
 										<linearGradient id="fillBrands" x1="0" y1="0" x2="0" y2="1">
-											<stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-											<stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1} />
+											<stop offset="5%" stopColor="var(--brand)" stopOpacity={0.8} />
+											<stop offset="95%" stopColor="var(--brand)" stopOpacity={0.1} />
 										</linearGradient>
 									</defs>
 									<CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -457,7 +457,7 @@ function AdminDashboard() {
 										isAnimationActive={false}
 										content={<ChartTooltipContent className="min-w-[180px]" labelFormatter={tooltipLabelFormatter} />}
 									/>
-									<Area type="monotone" dataKey="count" stroke="#3b82f6" fill="url(#fillBrands)" strokeWidth={2} />
+									<Area type="monotone" dataKey="count" stroke="var(--brand)" fill="url(#fillBrands)" strokeWidth={2} />
 								</AreaChart>
 							</ResponsiveContainer>
 						</ChartContainer>

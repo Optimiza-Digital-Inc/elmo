@@ -5,7 +5,7 @@
  * packages/config, so these stories are also where a plan change shows up first.
  */
 import type { Meta, StoryObj } from "@storybook/react";
-import { DEFAULT_CHART_COLORS } from "@workspace/config/constants";
+import { DEFAULT_APP_NAME, DEFAULT_CHART_COLORS } from "@workspace/config/constants";
 import type { ReactNode } from "react";
 import { expect, within } from "storybook/test";
 import { DemoLogin, EmailPasswordLogin, SSOLogin } from "@/routes/auth/login";
@@ -16,7 +16,7 @@ import { setMockRouteContext } from "./_mocks/tanstack-router";
 const elmoConfig: ClientConfig = {
 	mode: "local",
 	features: { readOnly: false, showOptimizeButton: false, canCreateBrands: true },
-	branding: { name: "Elmo", chartColors: DEFAULT_CHART_COLORS.map((c) => c) },
+	branding: { name: DEFAULT_APP_NAME, chartColors: DEFAULT_CHART_COLORS.map((c) => c) },
 	analytics: {},
 	defaultDelayHours: 24,
 	canRegister: true,

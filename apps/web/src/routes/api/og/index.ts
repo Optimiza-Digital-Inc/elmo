@@ -1,13 +1,15 @@
 import { readFileSync } from "node:fs";
 import { extname } from "node:path";
 import { createFileRoute } from "@tanstack/react-router";
-import { DEFAULT_APP_NAME } from "@workspace/config/constants";
+import { DEFAULT_APP_ICON, DEFAULT_APP_NAME, DEFAULT_APP_THEME_COLOR } from "@workspace/config/constants";
 import { getDeployment } from "@workspace/deployment";
 import { OG_FONTS } from "@workspace/og/fonts";
 import { renderOgPng } from "@workspace/og/rasterize";
 import { OG_HEIGHT, OG_WIDTH, renderOgImage } from "@workspace/og/render";
+import localEyesWordmark from "@/assets/localeyes-wordmark.png?inline";
 
 const publicDir = new URL("../../../../public/", import.meta.url);
+const localEyesAccents = [DEFAULT_APP_THEME_COLOR, "#00273d", "#3d3b3a", "#e00016"];
 
 async function fetchIconAsDataUri(iconPath: string, appUrl: string, requestUrl: string): Promise<string | undefined> {
 	const readPublicIcon = (pathname: string): string | undefined => {
@@ -69,19 +71,20 @@ export const Route = createFileRoute("/api/og/")({
 				const { branding } = deployment;
 
 				const appName = forceDefault ? DEFAULT_APP_NAME : branding.name;
-
-				let iconDataUri: string | undefined;
-				if (!forceDefault && appName !== DEFAULT_APP_NAME && branding.icon) {
-					iconDataUri = await fetchIconAsDataUri(branding.icon, branding.url, request.url);
-				}
+				const usesDefaultBranding =
+					forceDefault || (appName === DEFAULT_APP_NAME && branding.icon === DEFAULT_APP_ICON);
+				const iconDataUri = usesDefaultBranding
+					? undefined
+					: await fetchIconAsDataUri(branding.icon, branding.url, request.url);
 
 				const png = await renderOgPng(
 					renderOgImage({
 						appName,
 						title,
 						description,
-						accentColors: forceDefault ? undefined : branding.chartColors.slice(0, 4),
+						accentColors: usesDefaultBranding ? localEyesAccents : branding.chartColors.slice(0, 4),
 						iconDataUri,
+						wordmarkDataUri: usesDefaultBranding ? localEyesWordmark : undefined,
 						url: branding.url,
 					}),
 					{ width: OG_WIDTH, height: OG_HEIGHT, fonts: OG_FONTS },

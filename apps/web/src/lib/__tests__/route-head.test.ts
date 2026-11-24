@@ -17,16 +17,16 @@ const branded = (name: string) => ({
 });
 
 describe("getAppName", () => {
-	it('returns "Elmo" when the match has no context', () => {
-		expect(getAppName({})).toBe("Elmo");
+	it('returns "LocalEyes" when the match has no context', () => {
+		expect(getAppName({})).toBe("LocalEyes");
 	});
 
 	it("returns the branding name when set", () => {
 		expect(getAppName(branded("Acme Insights"))).toBe("Acme Insights");
 	});
 
-	it('returns "Elmo" when the branding name is an empty string', () => {
-		expect(getAppName(branded(""))).toBe("Elmo");
+	it('returns "LocalEyes" when the branding name is an empty string', () => {
+		expect(getAppName(branded(""))).toBe("LocalEyes");
 	});
 });
 
@@ -73,7 +73,7 @@ describe("pageHead", () => {
 
 	it("uses just the app name when there is neither a title nor a breadcrumb", () => {
 		expect(pageHead({})({ match: {}, matches: [] })).toEqual({
-			meta: [{ title: "Elmo" }],
+			meta: [{ title: "LocalEyes" }],
 		});
 	});
 

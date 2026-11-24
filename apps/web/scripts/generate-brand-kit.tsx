@@ -27,7 +27,7 @@ import { createWriteStream, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { DEFAULT_APP_NAME } from "@workspace/config/constants";
+import { ELMO_APP_NAME } from "@workspace/config/constants";
 import { renderOgPng } from "@workspace/og/rasterize";
 import { OG_HEIGHT, OG_WIDTH, renderOgImage } from "@workspace/og/render";
 import { ZipArchive } from "archiver";
@@ -269,7 +269,7 @@ for (const bg of logoBgs) {
 }
 
 console.log("\nOG Images:");
-const ogData = await render(renderOgImage({ appName: DEFAULT_APP_NAME, url: SITE_URL }), OG_WIDTH, OG_HEIGHT);
+const ogData = await render(renderOgImage({ appName: ELMO_APP_NAME, url: SITE_URL }), OG_WIDTH, OG_HEIGHT);
 files.push({ name: "og/og-default.png", data: ogData });
 console.log("  ✓ og/og-default.png  (1200×630)");
 

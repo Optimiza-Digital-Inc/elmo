@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { DEFAULT_APP_NAME } from "@workspace/config/constants";
+import { ELMO_APP_NAME } from "@workspace/config/constants";
 import { OG_FONTS } from "@workspace/og/fonts";
 import { renderOgPng } from "@workspace/og/rasterize";
 import { OG_HEIGHT, OG_WIDTH, renderOgImage } from "@workspace/og/render";
@@ -15,7 +15,7 @@ export const Route = createFileRoute("/og.png")({
 				const label = url.searchParams.get("label") ?? undefined;
 
 				const png = await renderOgPng(
-					renderOgImage({ appName: DEFAULT_APP_NAME, title, description, label, url: SITE_URL }),
+					renderOgImage({ appName: ELMO_APP_NAME, title, description, label, url: SITE_URL }),
 					{ width: OG_WIDTH, height: OG_HEIGHT, fonts: OG_FONTS },
 				);
 

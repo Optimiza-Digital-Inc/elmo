@@ -1,5 +1,5 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import { DEFAULT_APP_NAME } from "@workspace/config/constants";
+import { ELMO_APP_NAME } from "@workspace/config/constants";
 import { OG_FONTS } from "@workspace/og/fonts";
 import { renderOgPng } from "@workspace/og/rasterize";
 import { OG_HEIGHT, OG_WIDTH, renderOgImage } from "@workspace/og/render";
@@ -16,7 +16,7 @@ export const Route = createFileRoute("/og/docs/$")({
 
 				const png = await renderOgPng(
 					renderOgImage({
-						appName: DEFAULT_APP_NAME,
+						appName: ELMO_APP_NAME,
 						title: page.data.title,
 						description: page.data.description,
 						label: "Docs",

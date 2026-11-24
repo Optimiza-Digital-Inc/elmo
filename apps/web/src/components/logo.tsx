@@ -7,39 +7,53 @@ import type { ComponentPropsWithoutRef } from "react";
 interface LogoProps extends ComponentPropsWithoutRef<"div"> {
 	iconClassName?: string;
 	textClassName?: string;
+	wordmarkClassName?: string;
 }
 
-/** Whether the Titan One wordmark renders — drives the font preload in `__root.tsx`. */
-export function usesWordmarkFont(branding: { icon?: string; name?: string } | undefined) {
-	const hasCustomBranding =
-		Boolean(branding?.icon && branding?.name) &&
-		(branding?.icon !== DEFAULT_APP_ICON || branding?.name !== DEFAULT_APP_NAME);
-	return !hasCustomBranding;
+interface BrandLogoProps extends LogoProps {
+	branding?: { name?: string; icon?: string };
+	crossOrigin?: ComponentPropsWithoutRef<"img">["crossOrigin"];
 }
 
-export function Logo({ className, iconClassName, textClassName, ...props }: LogoProps) {
-	const context = useRouteContext({ strict: false }) as { clientConfig?: ClientConfig };
-	const branding = context.clientConfig?.branding;
-
-	if (usesWordmarkFont(branding)) {
-		return (
-			<div {...props} className={cn("flex items-center gap-2", className)}>
-				<span className={cn("font-titan-one text-3xl font-normal lowercase text-blue-600", textClassName)}>elmo</span>
-			</div>
-		);
-	}
+export function BrandLogo({
+	branding,
+	className,
+	iconClassName,
+	textClassName,
+	wordmarkClassName,
+	crossOrigin,
+	...props
+}: BrandLogoProps) {
+	const name = branding?.name || DEFAULT_APP_NAME;
+	const icon = branding?.icon || DEFAULT_APP_ICON;
+	const usesDefaultLogo = name === DEFAULT_APP_NAME && icon === DEFAULT_APP_ICON;
 
 	return (
 		<div {...props} className={cn("flex items-center gap-2", className)}>
-			{branding?.icon && (
+			{usesDefaultLogo ? (
 				<img
-					src={branding.icon}
-					alt={`${branding.name} logo`}
-					className={cn("size-5", iconClassName)}
-					fetchPriority="low"
+					src="/icons/localeyes/wordmark.svg"
+					alt={name}
+					width={2116}
+					height={321}
+					className={cn("h-6 w-auto", wordmarkClassName)}
 				/>
+			) : (
+				<>
+					<img
+						src={icon}
+						alt={`${name} logo`}
+						className={cn("size-5 object-contain", iconClassName)}
+						crossOrigin={crossOrigin}
+					/>
+					<span className={cn("text-base font-semibold", textClassName)}>{name}</span>
+				</>
 			)}
-			<span className={cn("text-base font-semibold", textClassName)}>{branding?.name}</span>
 		</div>
 	);
+}
+
+export function Logo(props: LogoProps) {
+	const context = useRouteContext({ strict: false }) as { clientConfig?: ClientConfig };
+	return <BrandLogo branding={context.clientConfig?.branding} {...props} />;
 }

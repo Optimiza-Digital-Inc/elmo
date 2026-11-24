@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import * as p from "@clack/prompts";
+import { DEFAULT_APP_ICON, DEFAULT_APP_NAME } from "@workspace/config/constants";
 import { CLOUD_ENTRY_PRICE_USD } from "@workspace/config/plans";
 import { cloudPricingUrl } from "@workspace/config/referrals";
 import { formatScrapeTarget } from "@workspace/config/scrape-targets";
@@ -31,8 +32,6 @@ export type InitOptions = {
 	dockerDir?: string;
 };
 
-const DEFAULT_APP_NAME = "Elmo";
-const DEFAULT_APP_ICON = "/icons/elmo-icon.svg";
 const DEFAULT_APP_PORT = 1515;
 const LOCAL_DATABASE_URL = "postgres://postgres:postgres@postgres:5432/elmo";
 const TELEMETRY_DOC_URL = "https://elmohq.com/docs/developer-guide/telemetry";

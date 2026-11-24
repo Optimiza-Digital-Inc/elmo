@@ -1,7 +1,9 @@
 /** Whitelabel never falls back to these; it must set its own branding. */
-export const DEFAULT_APP_NAME = "Elmo";
-export const DEFAULT_APP_ICON = "/icons/elmo-icon.svg";
+export const DEFAULT_APP_NAME = "LocalEyes";
+export const DEFAULT_APP_ICON = "/icons/localeyes/favicon.svg";
 export const DEFAULT_APP_URL = "http://localhost:3000/";
+export const DEFAULT_APP_THEME_COLOR = "#0085d3";
+export const ELMO_APP_NAME = "Elmo";
 
 /** Per-provider anchors are appended, so this must stay the page itself, not the docs index. */
 export const PROVIDERS_DOCS_URL = "https://www.elmohq.com/docs/user-guide/providers";
@@ -15,8 +17,6 @@ export const CRISP_WEBSITE_ID = "2f79a110-4e29-41a8-b45d-4993df6ff487";
 
 export const ELMO_BRAND_COLOR = "#2563eb"; // blue-600
 export const ELMO_BRAND_FONT = "Titan One";
-export const ELMO_THEME_COLOR = "#2563eb";
-export const ELMO_BACKGROUND_COLOR = "#ffffff";
 
 /**
  * Whitelabel overrides these via VITE_CHART_COLORS. Hue order is load-bearing:
@@ -25,7 +25,7 @@ export const ELMO_BACKGROUND_COLOR = "#ffffff";
  */
 export const DEFAULT_CHART_COLORS = [
 	// Base
-	"#2563eb",
+	DEFAULT_APP_THEME_COLOR,
 	"#efb118",
 	"#ff8ab7",
 	"#9c6b4e",

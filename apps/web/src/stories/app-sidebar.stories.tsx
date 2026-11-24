@@ -4,7 +4,7 @@
  * rather than reading the useBrand hook.
  */
 import type { Meta, StoryObj } from "@storybook/react";
-import { DEFAULT_CHART_COLORS } from "@workspace/config/constants";
+import { DEFAULT_APP_NAME, DEFAULT_CHART_COLORS } from "@workspace/config/constants";
 import { SidebarInset, SidebarProvider } from "@workspace/ui/components/sidebar";
 import { expect, screen, userEvent, within } from "storybook/test";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -49,7 +49,7 @@ const localConfig: ClientConfig = {
 		showOptimizeButton: false,
 		canCreateBrands: true,
 	},
-	branding: { name: "Elmo", chartColors: DEFAULT_CHART_COLORS },
+	branding: { name: DEFAULT_APP_NAME, chartColors: DEFAULT_CHART_COLORS },
 	analytics: {},
 };
 
@@ -60,7 +60,7 @@ const demoConfig: ClientConfig = {
 		showOptimizeButton: false,
 		canCreateBrands: false,
 	},
-	branding: { name: "Elmo", chartColors: DEFAULT_CHART_COLORS },
+	branding: { name: DEFAULT_APP_NAME, chartColors: DEFAULT_CHART_COLORS },
 	analytics: {},
 };
 
@@ -101,7 +101,7 @@ const cloudConfig: ClientConfig = {
 		teamInvites: true,
 		reportGeneration: false,
 	},
-	branding: { name: "Elmo", chartColors: DEFAULT_CHART_COLORS },
+	branding: { name: DEFAULT_APP_NAME, chartColors: DEFAULT_CHART_COLORS },
 	analytics: {},
 };
 

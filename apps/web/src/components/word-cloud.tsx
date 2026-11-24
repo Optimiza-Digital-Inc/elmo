@@ -15,7 +15,7 @@ export interface WordCloudTerm {
 const PALETTE = [
 	"#7c3aed", // violet
 	"#4f46e5", // indigo
-	"#2563eb", // blue
+	"var(--primary)", // blue
 	"#0891b2", // cyan
 	"#0d9488", // teal
 	"#059669", // emerald

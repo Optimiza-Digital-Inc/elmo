@@ -4,7 +4,13 @@
  * so server code never pulls in the React OptimizeButton.
  */
 
-import { DEFAULT_APP_ICON, DEFAULT_APP_NAME, DEFAULT_APP_URL, DEFAULT_CHART_COLORS } from "@workspace/config/constants";
+import {
+	DEFAULT_APP_ICON,
+	DEFAULT_APP_NAME,
+	DEFAULT_APP_URL,
+	DEFAULT_CHART_COLORS,
+	ELMO_APP_NAME,
+} from "@workspace/config/constants";
 import { getDeploymentModeFromEnv, getEnv, requireEnvVars } from "@workspace/config/env";
 import type { BrandingConfig, Deployment, DeploymentMode, FeaturesConfig } from "@workspace/config/types";
 
@@ -109,9 +115,13 @@ function brandingFor(mode: DeploymentMode, env: Env): BrandingConfig {
 		};
 	}
 
+	const name = getEnv("APP_NAME", DEFAULT_APP_NAME, env);
+	const icon = getEnv("APP_ICON", DEFAULT_APP_ICON, env);
+	const usesLegacyDefaults = name === ELMO_APP_NAME && icon === "/icons/elmo-icon.svg";
+
 	return {
-		name: getEnv("APP_NAME", DEFAULT_APP_NAME, env),
-		icon: getEnv("APP_ICON", DEFAULT_APP_ICON, env),
+		name: usesLegacyDefaults ? DEFAULT_APP_NAME : name,
+		icon: usesLegacyDefaults ? DEFAULT_APP_ICON : icon,
 		url: getEnv("APP_URL", DEFAULT_APP_URL, env),
 		parentName: env.APP_PARENT_NAME,
 		parentUrl: env.APP_PARENT_URL,

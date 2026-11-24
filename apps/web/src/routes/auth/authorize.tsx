@@ -35,7 +35,9 @@ export const Route = createFileRoute("/auth/authorize")({
 
 function AuthorizePage() {
 	const search = Route.useSearch();
-	const { viewer } = Route.useRouteContext();
+	const context = Route.useRouteContext();
+	const { viewer } = context;
+	const appName = getAppName({ context });
 	const { client } = Route.useLoaderData();
 	const [connecting, setConnecting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -78,7 +80,7 @@ function AuthorizePage() {
 
 	if (!client) {
 		return (
-			<FullPageCard title="Connect to Elmo" subtitle="This client isn't registered with this instance.">
+			<FullPageCard title={`Connect to ${appName}`} subtitle="This client isn't registered with this instance.">
 				<Alert variant="destructive">
 					<AlertDescription>
 						Continuing will not work — start the connection from your MCP client again.
@@ -89,7 +91,10 @@ function AuthorizePage() {
 	}
 
 	return (
-		<FullPageCard title="Connect to Elmo" subtitle={`${label} is asking to read and manage your Elmo data.`}>
+		<FullPageCard
+			title={`Connect to ${appName}`}
+			subtitle={`${label} is asking to read and manage your ${appName} data.`}
+		>
 			<div className="w-full space-y-4">
 				{error && (
 					<Alert variant="destructive">
@@ -119,8 +124,8 @@ function AuthorizePage() {
 				{client.loopbackOnly && (
 					<Alert>
 						<AlertDescription>
-							This client runs on your computer, so Elmo can't tell which program is asking. Continue only if you just
-							started this from a client you trust.
+							This client runs on your computer, so this service can't tell which program is asking. Continue only if
+							you just started this from a client you trust.
 						</AlertDescription>
 					</Alert>
 				)}

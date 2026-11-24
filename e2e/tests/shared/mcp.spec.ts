@@ -4,7 +4,7 @@ import { request as playwrightRequest } from "@playwright/test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { expect, test } from "../../test";
-import { API_KEYS, NIKE_BRAND_ID, TEST_API_KEY, TEST_BRAND_ID, TEST_USER } from "../../fixtures";
+import { API_KEYS, NIKE_BRAND_ID, TEST_API_KEY, TEST_BRAND_ID, TEST_USER, WHITELABEL } from "../../fixtures";
 
 const MCP_PATH = "/api/mcp";
 
@@ -192,7 +192,8 @@ test.describe("MCP", () => {
     const discovery = await (await anonymous.get("/.well-known/oauth-authorization-server")).json();
     await page.goto(`${new URL(discovery.authorization_endpoint).pathname}?${query}`);
     await expect(page).toHaveURL(/\/auth\/authorize\?/);
-    await expect(page.getByText("Connect to Elmo")).toBeVisible();
+    const appName = testInfo.project.name === "whitelabel" ? WHITELABEL.appName : "LocalEyes";
+    await expect(page.getByText(`Connect to ${appName}`)).toBeVisible();
     await expect(page.getByText("Playwright MCP Client").first()).toBeVisible();
     await expect(page.getByText("127.0.0.1:41999")).toBeVisible();
 

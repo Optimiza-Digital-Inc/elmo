@@ -204,7 +204,7 @@ export function ModelGrid({ landscape, metric }: { landscape: Landscape; metric:
 					<tr
 						key={company.name}
 						ref={company.isBrand ? brandRow : undefined}
-						className={cn("border-b last:border-0", company.isBrand && "bg-blue-50/70")}
+						className={cn("border-b last:border-0", company.isBrand && "bg-accent/70")}
 					>
 						{/* Counts the rows in whatever order the grid is sorted, so it always reads top to bottom. */}
 						<td className="py-1.5 pl-4 text-right text-xs tabular-nums text-muted-foreground">{i + 1}</td>

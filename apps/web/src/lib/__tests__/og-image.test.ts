@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { DEFAULT_APP_NAME } from "@workspace/config/constants";
+import { ELMO_APP_NAME } from "@workspace/config/constants";
 import { renderOgPng } from "@workspace/og/rasterize";
 import { OG_HEIGHT, OG_WIDTH, type OgImageOptions, renderOgImage } from "@workspace/og/render";
 import { describe, expect, it } from "vitest";
@@ -32,7 +32,7 @@ const ONE_PIXEL_PNG =
 
 describe("Open Graph card", () => {
 	it("renders the default Elmo card without a title or description", async () => {
-		await expect(renderCard({ appName: DEFAULT_APP_NAME, url: "https://www.elmohq.com" })).resolves.toEqual({
+		await expect(renderCard({ appName: ELMO_APP_NAME, url: "https://www.elmohq.com" })).resolves.toEqual({
 			width: OG_WIDTH,
 			height: OG_HEIGHT,
 		});
@@ -43,7 +43,7 @@ describe("Open Graph card", () => {
 			"How to Track Your Brand's Visibility in ChatGPT, Claude, Perplexity, Gemini, and Google AI Overviews ".repeat(4);
 		const description = "A step-by-step guide to measuring where your brand shows up in AI answers. ".repeat(10);
 		await expect(
-			renderCard({ appName: DEFAULT_APP_NAME, title, description, label: "Blog", url: "https://www.elmohq.com" }),
+			renderCard({ appName: ELMO_APP_NAME, title, description, label: "Blog", url: "https://www.elmohq.com" }),
 		).resolves.toEqual({ width: OG_WIDTH, height: OG_HEIGHT });
 	});
 

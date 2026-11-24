@@ -6,6 +6,7 @@
  */
 import { createFileRoute, notFound, useRouteContext } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
+import { DEFAULT_APP_NAME, DEFAULT_APP_URL } from "@workspace/config/constants";
 import type { ClientConfig } from "@workspace/config/types";
 import {
 	analyzeByEngine,
@@ -415,7 +416,7 @@ function CoverPage({
 				<div className="h-[3px] bg-slate-800 -mx-10 print:-mx-0 mb-8" />
 
 				<div className="flex items-center justify-between mb-16">
-					<Logo iconClassName="!size-5" textClassName="text-sm font-semibold text-slate-400" />
+					<Logo iconClassName="size-5" wordmarkClassName="h-4" textClassName="text-sm font-semibold text-slate-400" />
 					<span className="text-xs tracking-wide text-slate-400">
 						{new Date(report.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
 					</span>
@@ -533,7 +534,7 @@ function CompetitiveOverviewPage({
 							]
 								.sort((a, b) => b.sov - a.sov)
 								.map((row) => (
-									<tr key={`sov-${row.name}`} className={row.isBrand ? "bg-blue-50/30" : ""}>
+									<tr key={`sov-${row.name}`} className={row.isBrand ? "bg-accent/50" : ""}>
 										<td className={`py-2.5 px-4 text-sm ${row.isBrand ? "font-semibold" : "text-slate-600"}`}>
 											{row.name}
 										</td>
@@ -543,7 +544,7 @@ function CompetitiveOverviewPage({
 											</span>
 										</td>
 										<td className="py-2.5 px-4">
-											<Bar value={row.sov} color={row.isBrand ? "bg-blue-500" : "bg-slate-300"} />
+											<Bar value={row.sov} color={row.isBrand ? "bg-brand" : "bg-slate-300"} />
 										</td>
 									</tr>
 								))}
@@ -581,7 +582,7 @@ function CompetitiveOverviewPage({
 									]
 										.sort((a, b) => b.mentionCount - a.mentionCount)
 										.map((c) => (
-											<tr key={`mention-${c.name}`} className={c.isBrand ? "bg-blue-50/30" : ""}>
+											<tr key={`mention-${c.name}`} className={c.isBrand ? "bg-accent/50" : ""}>
 												<td
 													className={`py-2 px-4 text-xs font-medium ${c.isBrand ? "text-slate-900" : "text-slate-700"}`}
 												>
@@ -880,10 +881,10 @@ function CallToActionPage({ branding }: { branding?: ClientConfig["branding"] })
 		<>
 			{/* ===== CTA ===== */}
 			<div className="print:break-before-page print:h-[9.5in] print:flex print:flex-col print:justify-center p-10 print:p-0">
-				<div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-10 text-center">
+				<div className="bg-linear-to-r from-accent to-secondary border border-brand/20 rounded-xl p-10 text-center">
 					<h2 className="text-2xl font-bold text-slate-800 mb-2">Ready to Optimize Your AI Visibility?</h2>
 					<p className="text-slate-600 text-base mb-8">
-						Take your brand's AI presence to the next level with {branding?.name || "Elmo"}
+						Take your brand's AI presence to the next level with {branding?.name || DEFAULT_APP_NAME}
 					</p>
 
 					<div className="grid grid-cols-3 gap-6 mb-8">
@@ -916,11 +917,13 @@ function CallToActionPage({ branding }: { branding?: ClientConfig["branding"] })
 						</div>
 					</div>
 
-					<div className="pt-6 border-t border-blue-200">
-						<p className="text-slate-800 font-medium mb-2">Get started with {branding?.name || "Elmo"} today</p>
+					<div className="pt-6 border-t border-brand/20">
+						<p className="text-slate-800 font-medium mb-2">
+							Get started with {branding?.name || DEFAULT_APP_NAME} today
+						</p>
 						<p className="text-slate-600 text-sm text-balance">
-							Visit <strong>{branding?.url || "elmo.chat"}</strong> to learn more about our AI visibility platform and
-							services.
+							Visit <strong>{branding?.url || DEFAULT_APP_URL}</strong> to learn more about our AI visibility platform
+							and services.
 						</p>
 					</div>
 				</div>
@@ -1043,7 +1046,7 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 function Finding({ children }: { children: React.ReactNode }) {
 	return (
 		<div className="flex gap-3 items-start">
-			<div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-[7px] shrink-0" />
+			<div className="w-1.5 h-1.5 rounded-full bg-brand mt-[7px] shrink-0" />
 			<p className="text-sm text-slate-700 leading-relaxed">{children}</p>
 		</div>
 	);
@@ -1052,8 +1055,8 @@ function Finding({ children }: { children: React.ReactNode }) {
 function PageFooter({ branding }: { branding?: ClientConfig["branding"] }) {
 	return (
 		<div className="pt-4 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400">
-			<Logo iconClassName="!size-3" textClassName="text-[10px] font-medium text-slate-400" />
-			<span>{branding?.url || "elmo.chat"}</span>
+			<Logo iconClassName="size-3" wordmarkClassName="h-3" textClassName="text-[10px] font-medium text-slate-400" />
+			<span>{branding?.url || DEFAULT_APP_URL}</span>
 		</div>
 	);
 }

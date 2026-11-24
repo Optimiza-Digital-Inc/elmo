@@ -4,7 +4,7 @@
  * isolation rather than on hue, and these are how you check that still holds.
  */
 import type { Meta } from "@storybook/react";
-import { DEFAULT_CHART_COLORS } from "@workspace/config/constants";
+import { DEFAULT_APP_NAME, DEFAULT_CHART_COLORS } from "@workspace/config/constants";
 import type { Brand, Competitor } from "@workspace/lib/db/schema";
 import { expect, userEvent, within } from "storybook/test";
 import { BaseChart } from "@/components/base-chart";
@@ -77,7 +77,7 @@ function makeData(days: number): ChartDataPoint[] {
 const clientConfig: ClientConfig = {
 	mode: "local",
 	features: { readOnly: false, showOptimizeButton: false, canCreateBrands: true },
-	branding: { name: "Elmo", chartColors: DEFAULT_CHART_COLORS },
+	branding: { name: DEFAULT_APP_NAME, chartColors: DEFAULT_CHART_COLORS },
 	analytics: {},
 };
 

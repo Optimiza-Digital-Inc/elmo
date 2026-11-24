@@ -1,4 +1,4 @@
-import { DEFAULT_APP_NAME } from "@workspace/config/constants";
+import { ELMO_APP_NAME } from "@workspace/config/constants";
 import { ACCENT_COLORS, OgFrame, OgHeader } from "@workspace/og/render";
 import {
 	isRetiredTarget,
@@ -78,7 +78,7 @@ export function renderStatusOgImage(allData: TargetStatus[]) {
 
 	return (
 		<OgFrame accentColors={ACCENT_COLORS} footer="elmohq.com/status">
-			<OgHeader appName={DEFAULT_APP_NAME} label="AI Provider Status" />
+			<OgHeader appName={ELMO_APP_NAME} label="AI Provider Status" />
 
 			<div style={{ display: "flex", flexDirection: "column", marginTop: 40 }}>
 				<div style={{ display: "flex", alignItems: "center" }}>

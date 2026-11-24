@@ -1,5 +1,5 @@
 import type { Meta } from "@storybook/react";
-import { DEFAULT_CHART_COLORS } from "@workspace/config/constants";
+import { DEFAULT_APP_NAME, DEFAULT_CHART_COLORS } from "@workspace/config/constants";
 import { ChartExportPreview, type ChartExportPreviewProps } from "@/components/chart-export-preview";
 import { type ClientConfig, setMockClientConfig } from "./_mocks/config-client";
 import { MockRouteContextProvider, setMockRouteContext } from "./_mocks/tanstack-router";
@@ -66,7 +66,7 @@ function generateChartData(days: number) {
 const defaultClientConfig: ClientConfig = {
 	mode: "local",
 	features: { readOnly: false, showOptimizeButton: false, canCreateBrands: true },
-	branding: { name: "Elmo", chartColors: DEFAULT_CHART_COLORS },
+	branding: { name: DEFAULT_APP_NAME, chartColors: DEFAULT_CHART_COLORS },
 	analytics: {},
 };
 

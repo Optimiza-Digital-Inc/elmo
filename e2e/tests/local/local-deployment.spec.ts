@@ -108,22 +108,27 @@ test.describe("Local features", () => {
     await page.waitForURL(/\/app$/, { timeout: 30_000 });
   });
 
-  test("stock Elmo branding is used", async ({ page }) => {
+  test("the dashboard uses LocalEyes branding", async ({ page }) => {
     await page.goto(`${brandUrl()}`);
 
-    // The Elmo wordmark, not a whitelabel icon + name.
-    await expect(page.getByText("elmo", { exact: true }).first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("img", { name: "LocalEyes", exact: true }).first()).toBeVisible({ timeout: 30_000 });
+    await expect(page).toHaveTitle(/LocalEyes$/);
+    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#0085d3");
     // Self-hosters get the version and project links a whitelabel build hides.
     await expect(page.locator('a[href="https://github.com/elmohq/elmo"]')).toBeVisible();
   });
 
-  test("the web manifest carries the Elmo icons", async ({ request }) => {
+  test("the web manifest carries installable LocalEyes icons", async ({ request }) => {
     const response = await request.get("/api/manifest");
     expect(response.status()).toBe(200);
 
-    const manifest = (await response.json()) as { short_name: string; icons: { src: string }[] };
-    expect(manifest.short_name).toBe("Elmo");
-    expect(manifest.icons.some((icon) => icon.src.startsWith("/icons/elmo-icon"))).toBe(true);
+    const manifest = (await response.json()) as { short_name: string; theme_color: string; icons: { src: string }[] };
+    expect(manifest.short_name).toBe("LocalEyes");
+    expect(manifest.theme_color).toBe("#0085d3");
+    expect(manifest.icons.map((icon) => icon.src)).toContain("/icons/localeyes/icon-192.png");
+    for (const icon of manifest.icons) {
+      expect((await request.get(icon.src)).ok()).toBe(true);
+    }
   });
 
   test("an installed app launches at the app root, not the manifest's own directory", async ({ request }) => {

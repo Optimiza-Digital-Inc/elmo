@@ -1,10 +1,10 @@
-import { DEFAULT_APP_ICON, DEFAULT_APP_NAME } from "@workspace/config/constants";
 import type { Competitor } from "@workspace/lib/db/schema";
 import { Badge } from "@workspace/ui/components/badge";
 import type { ChartDataPoint, ChartSubject } from "@/lib/chart-utils";
 import { visibilityBadgeProps } from "@/lib/chart-utils";
 import type { LookbackPeriod } from "@/lib/lookback";
 import { BaseChart } from "./base-chart";
+import { BrandLogo } from "./logo";
 
 interface ChartExportBranding {
 	name?: string;
@@ -43,10 +43,8 @@ export function ChartExportPreview({
 	competitors,
 	branding,
 }: ChartExportPreviewProps) {
-	const name = branding.name || DEFAULT_APP_NAME;
-	const isWhitelabel = branding.isWhitelabel && branding.name !== DEFAULT_APP_NAME;
-	const domain = isWhitelabel ? branding.parentUrl?.replace(/^https?:\/\//, "").replace(/\/$/, "") || "" : "elmohq.com";
-	const hasCustomIcon = branding.icon && branding.icon !== DEFAULT_APP_ICON;
+	const domain =
+		branding.parentUrl?.replace(/^https?:\/\//, "").replace(/\/$/, "") ?? (branding.isWhitelabel ? "" : "localeyes.ai");
 
 	return (
 		<div
@@ -89,26 +87,13 @@ export function ChartExportPreview({
 
 			{/* Branding footer — fills remaining space, content vertically centered */}
 			<div className="flex-1 flex items-center justify-between px-10 min-h-0">
-				<div className="flex items-center gap-3">
-					{isWhitelabel && hasCustomIcon && (
-						<img
-							src={branding.icon}
-							alt={`${name} logo`}
-							style={{ width: 28, height: 28 }}
-							className="object-contain"
-							crossOrigin="anonymous"
-						/>
-					)}
-					{isWhitelabel ? (
-						<span style={{ fontSize: 18 }} className="text-gray-500 font-semibold">
-							{name}
-						</span>
-					) : (
-						<span className="font-titan-one font-normal lowercase text-blue-600" style={{ fontSize: 24 }}>
-							elmo
-						</span>
-					)}
-				</div>
+				<BrandLogo
+					branding={branding}
+					className="gap-3"
+					iconClassName="size-7"
+					textClassName="text-lg text-muted-foreground"
+					crossOrigin="anonymous"
+				/>
 				<span style={{ fontSize: 18 }} className="text-gray-400 font-medium">
 					{domain}
 				</span>

@@ -1,4 +1,4 @@
-import { DEFAULT_CHART_COLORS } from "@workspace/config/constants";
+import { DEFAULT_APP_NAME, DEFAULT_CHART_COLORS } from "@workspace/config/constants";
 
 export type DeploymentMode = "whitelabel" | "local" | "demo" | "cloud";
 
@@ -49,7 +49,7 @@ let _config: ClientConfig = {
 		canCreateBrands: false,
 	},
 	branding: {
-		name: "Elmo",
+		name: DEFAULT_APP_NAME,
 		chartColors: DEFAULT_CHART_COLORS,
 	},
 	analytics: {},

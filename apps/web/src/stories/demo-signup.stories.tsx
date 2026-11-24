@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { DEFAULT_CHART_COLORS } from "@workspace/config/constants";
+import { DEFAULT_APP_NAME, DEFAULT_CHART_COLORS } from "@workspace/config/constants";
 import { expect, within } from "storybook/test";
 import { DemoSignupCta } from "@/components/demo-signup-cta";
 import { UnsavedChangesBar } from "@/components/unsaved-changes-bar";
@@ -10,7 +10,7 @@ import { setMockRouteContext } from "./_mocks/tanstack-router";
 const demoConfig: ClientConfig = {
 	mode: "demo",
 	features: { readOnly: true, showOptimizeButton: false, canCreateBrands: false, promotesCloud: true },
-	branding: { name: "Elmo", chartColors: DEFAULT_CHART_COLORS },
+	branding: { name: DEFAULT_APP_NAME, chartColors: DEFAULT_CHART_COLORS },
 	analytics: {},
 };
 
@@ -22,7 +22,7 @@ const readOnlySelfHostConfig: ClientConfig = {
 const cloudConfig: ClientConfig = {
 	mode: "cloud",
 	features: { readOnly: false, showOptimizeButton: false, canCreateBrands: true, billing: true },
-	branding: { name: "Elmo", chartColors: DEFAULT_CHART_COLORS },
+	branding: { name: DEFAULT_APP_NAME, chartColors: DEFAULT_CHART_COLORS },
 	analytics: {},
 };
 

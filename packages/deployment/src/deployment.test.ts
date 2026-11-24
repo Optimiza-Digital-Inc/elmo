@@ -10,14 +10,21 @@ const WHITELABEL_ENV = {
 };
 
 describe("branding", () => {
-	it("falls back to the Elmo defaults when nothing is configured", () => {
+	it("uses LocalEyes branding when nothing is configured", () => {
 		expect(buildDeployment("local", {}).branding).toEqual({
-			name: DEFAULT_APP_NAME,
-			icon: DEFAULT_APP_ICON,
+			name: "LocalEyes",
+			icon: "/icons/localeyes/favicon.svg",
 			url: DEFAULT_APP_URL,
 			parentName: undefined,
 			parentUrl: undefined,
 			chartColors: DEFAULT_CHART_COLORS,
+		});
+	});
+
+	it("uses LocalEyes branding when a local install has the old CLI defaults", () => {
+		expect(buildDeployment("local", { APP_NAME: "Elmo", APP_ICON: "/icons/elmo-icon.svg" }).branding).toMatchObject({
+			name: "LocalEyes",
+			icon: "/icons/localeyes/favicon.svg",
 		});
 	});
 
@@ -51,7 +58,7 @@ describe("branding", () => {
 		});
 	});
 
-	it("ignores VITE_APP_* overrides in cloud, which ships the Elmo defaults", () => {
+	it("ignores VITE_APP_* overrides in cloud, which uses the default branding", () => {
 		const { branding } = buildDeployment("cloud", {
 			VITE_APP_NAME: "Should Be Ignored",
 			VITE_APP_ICON: "https://cdn.example.com/ignored.png",

@@ -451,7 +451,6 @@ function MentionsTab({
 						count: stat.count,
 						icon: <SiteIcon domain={domainFor(stat.name)} size="md" />,
 					}))}
-					defaultColor="#3b82f6"
 					customTotal={totalRuns || 1}
 					highlightLabel={brandName}
 				/>

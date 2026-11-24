@@ -150,7 +150,7 @@ export function AppSidebar({ section, organization, brand }: AppSidebarProps) {
 	];
 	const brandmark = (
 		<>
-			<Logo iconClassName="!size-5" />
+			<Logo wordmarkClassName="h-5" />
 			<div className="ml-auto group-data-[collapsible=icon]:hidden">
 				<DemoModePill />
 			</div>

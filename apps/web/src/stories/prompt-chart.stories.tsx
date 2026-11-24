@@ -1,5 +1,5 @@
 import type { Meta } from "@storybook/react";
-import { DEFAULT_CHART_COLORS } from "@workspace/config/constants";
+import { DEFAULT_APP_NAME, DEFAULT_CHART_COLORS } from "@workspace/config/constants";
 import { CachedPromptChart, type CachedPromptChartProps } from "@/components/cached-prompt-chart";
 import { type ProcessedChartData, setMockChartDataContext } from "./_mocks/chart-data-context";
 import { type ClientConfig, setMockClientConfig } from "./_mocks/config-client";
@@ -14,7 +14,7 @@ const defaultClientConfig: ClientConfig = {
 		canCreateBrands: true,
 	},
 	branding: {
-		name: "Elmo",
+		name: DEFAULT_APP_NAME,
 		parentName: "",
 		optimizationUrlTemplate: "",
 		chartColors: DEFAULT_CHART_COLORS,

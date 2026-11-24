@@ -9,7 +9,7 @@
 
 import { IconBrandGoogle } from "@tabler/icons-react";
 import { createFileRoute, Link, redirect, useNavigate, useRouteContext, useRouter } from "@tanstack/react-router";
-import { MCP_AUTHORIZE_ENDPOINT } from "@workspace/config/constants";
+import { DEFAULT_APP_NAME, MCP_AUTHORIZE_ENDPOINT } from "@workspace/config/constants";
 import type { ClientConfig } from "@workspace/config/types";
 import { authClient } from "@workspace/lib/auth/client";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
@@ -107,6 +107,7 @@ function LoginPage() {
 			destination={destination}
 			returnTo={returnTo}
 			attribution={attributionParams(search)}
+			appName={getAppName({ context })}
 			isCloud={mode === "cloud"}
 			canRegister={canRegister}
 		/>
@@ -212,12 +213,14 @@ export function EmailPasswordLogin({
 	destination = "/app",
 	returnTo,
 	attribution,
+	appName = DEFAULT_APP_NAME,
 	isCloud,
 	canRegister,
 }: {
 	destination?: string;
 	returnTo?: string;
 	attribution?: AttributionParams;
+	appName?: string;
 	isCloud?: boolean;
 	canRegister?: boolean;
 }) {
@@ -271,7 +274,7 @@ export function EmailPasswordLogin({
 	return (
 		<AuthSplitLayout
 			title="Welcome back"
-			subtitle={isCloud ? "Check in on your AI visibility." : "Sign in to your Elmo instance."}
+			subtitle={isCloud ? "Check in on your AI visibility." : `Sign in to your ${appName} instance.`}
 			pitch={<SalesPanel variant={isCloud ? "cloud" : "self-hosted"} source={source} />}
 			footer={<SalesFooterLinks source={source} />}
 		>
