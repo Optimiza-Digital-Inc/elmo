@@ -7,9 +7,20 @@ import type { Provider, ScrapeResult, StructuredResearchOptions, StructuredResea
  */
 const CANNED_RESEARCH = {
 	brandName: "Stub Brand",
+	country: "",
+	city: "",
+	serviceArea: "",
+	sourceUrl: "",
 	additionalDomains: [] as string[],
 	aliases: ["Stub"],
-	competitors: [{ name: "Stub Competitor", domains: ["stub-competitor.example"], aliases: [] as string[] }],
+	competitors: [
+		{
+			name: "Stub Competitor",
+			domains: ["stub-competitor.example"],
+			aliases: [] as string[],
+			localEvidence: { reason: "Example service area.", sourceUrl: "https://stub-competitor.example/service-area" },
+		},
+	],
 	suggestedPrompts: [
 		{ prompt: "best stub widgets", tags: ["stub"] },
 		{ prompt: "stub brand alternative", tags: ["stub"] },

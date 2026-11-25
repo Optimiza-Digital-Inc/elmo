@@ -5,7 +5,7 @@ import { brands, competitors, prompts } from "@workspace/lib/db/schema";
 import type { OnboardingPrompt } from "@workspace/lib/onboarding";
 import { eq } from "drizzle-orm";
 import { getBoss } from "@/lib/boss-client";
-import { type BrandJob, brandJobs, cancelLatestBrandJob, IN_FLIGHT_STATES, readBrandJob } from "@/lib/brand-jobs";
+import { type BrandJob, brandJobs, cancelBrandJob, IN_FLIGHT_STATES, readBrandJob } from "@/lib/brand-jobs";
 
 const SUGGEST_PROMPTS_QUEUE = "suggest-prompts";
 const SUGGESTIONS_PER_RUN = 5;
@@ -85,5 +85,5 @@ export async function getPromptSuggestionsStatus(brandId: string): Promise<Promp
 }
 
 export async function cancelPromptSuggestions(brandId: string): Promise<void> {
-	await cancelLatestBrandJob(SUGGEST_PROMPTS_QUEUE, brandId);
+	await cancelBrandJob(SUGGEST_PROMPTS_QUEUE, brandId);
 }

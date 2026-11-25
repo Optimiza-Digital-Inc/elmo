@@ -6,6 +6,13 @@ export {
 	type OnboardingSuggestion,
 } from "./analyze";
 export { runStructuredCompletionPrompt, runStructuredResearchPrompt } from "./llm";
+export {
+	type BrandLocation,
+	type BrandLocationSuggestion,
+	DETECT_BRAND_LOCATION_JOB_OPTIONS,
+	DETECT_BRAND_LOCATION_QUEUE,
+	detectBrandLocation,
+} from "./location";
 export { type SuggestPromptsOptions, suggestPrompts } from "./suggest-prompts";
 export {
 	cleanAndValidateDomain as cleanAndValidateOnboardingDomain,

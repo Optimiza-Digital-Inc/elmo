@@ -50,6 +50,11 @@ export function cleanDomain(input: string): string {
 	}
 }
 
+export function cleanSourceUrl(input: string): string | null {
+	if (!/^https?:\/\//i.test(input.trim())) return null;
+	return cleanUrl(input) || null;
+}
+
 function isValidDomain(domain: string): boolean {
 	return DOMAIN_REGEX.test(domain);
 }

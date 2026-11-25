@@ -1,20 +1,15 @@
-/**
- * Single-step onboarding wizard.
- *
- * One LLM call returns brand info, competitors, and prompts for review before
- * saving.
- */
-
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { cleanAndValidateDomain, validateAdditionalDomain } from "@workspace/lib/citations/domain-categories";
+import type { BrandLocation } from "@workspace/lib/onboarding";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
+import { Label } from "@workspace/ui/components/label";
 import { Separator } from "@workspace/ui/components/separator";
 import { Spinner } from "@workspace/ui/components/spinner";
 import { TagsInput } from "@workspace/ui/components/tags-input";
 import { AlertCircle, Play, Rocket } from "lucide-react";
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import { type CompetitorEntry, CompetitorsEditor, newCompetitorEntry } from "@/components/competitors-editor";
 import { type EditablePrompt, newPromptEntry, PromptsListEditor } from "@/components/prompts-list-editor";
 import { WriteErrorMessage } from "@/components/write-error-message";
@@ -23,6 +18,7 @@ import { citationKeys } from "@/hooks/use-citations";
 import { dashboardKeys } from "@/hooks/use-dashboard-summary";
 import { usePolledBrandJob } from "@/hooks/use-polled-brand-job";
 import { promptsSummaryKeys } from "@/hooks/use-prompts-summary";
+import type { BrandResearchJobRef } from "@/lib/analyze-brand-job";
 import { trackEvent } from "@/lib/posthog";
 import { useWriteErrorMessage } from "@/lib/write-errors";
 import {
@@ -47,6 +43,11 @@ interface WizardData {
 
 const DOMAIN_PASTE_SPLITTER = /[\n,\t]+/;
 const normalizeDomain = (raw: string) => cleanAndValidateDomain(raw) ?? raw.trim();
+const LOCATION_FIELDS = [
+	{ key: "country", label: "Country", placeholder: "Iraq" },
+	{ key: "city", label: "City", placeholder: "Erbil" },
+	{ key: "serviceArea", label: "Service Area", placeholder: "Erbil Governorate" },
+] as const;
 
 const EditableTagsInput = memo(
 	({
@@ -88,12 +89,125 @@ const EditableTagsInput = memo(
 );
 EditableTagsInput.displayName = "EditableTagsInput";
 
+function BrandResearchForm({
+	step,
+	website,
+	location,
+	locationSourceUrl,
+	error,
+	running,
+	onLocationChange,
+	onAnalyze,
+	onCancel,
+	onEnterManually,
+}: {
+	step: "start" | "location";
+	website: string | undefined;
+	location: BrandLocation;
+	locationSourceUrl: string | null | undefined;
+	error: string | null;
+	running: boolean;
+	onLocationChange: (location: BrandLocation) => void;
+	onAnalyze: () => void;
+	onCancel: () => void;
+	onEnterManually: () => void;
+}) {
+	const hasLocation = Object.values(location).some((value) => value.trim());
+
+	return (
+		<form
+			className="max-w-2xl mx-auto space-y-3"
+			onSubmit={(event) => {
+				event.preventDefault();
+				if (!running && website) onAnalyze();
+			}}
+		>
+			{step === "start" ? (
+				<p className="text-sm text-muted-foreground">
+					We'll look up where <strong>{website}</strong> serves customers so you can confirm the market before we
+					suggest competitors and AI tracking prompts.
+				</p>
+			) : (
+				<>
+					<h3 className="text-xl font-semibold">Confirm Your Market</h3>
+					<p className="text-sm text-muted-foreground">
+						Enter where you serve customers. If you leave the service area blank, we'll use the city or country you
+						provide.
+					</p>
+					{locationSourceUrl && (
+						<a className="text-sm text-primary underline" href={locationSourceUrl} target="_blank" rel="noreferrer">
+							View Location Source
+						</a>
+					)}
+					{locationSourceUrl === null && (
+						<p className="text-sm text-muted-foreground">We couldn't confirm a location from public sources.</p>
+					)}
+					<div className="grid gap-3 sm:grid-cols-2">
+						{LOCATION_FIELDS.map(({ key, label, placeholder }) => (
+							<div key={key} className={key === "serviceArea" ? "space-y-1.5 sm:col-span-2" : "space-y-1.5"}>
+								<Label htmlFor={`brand-${key}`}>{label}</Label>
+								<Input
+									id={`brand-${key}`}
+									value={location[key]}
+									onChange={(event) => onLocationChange({ ...location, [key]: event.target.value })}
+									placeholder={placeholder}
+									maxLength={200}
+									disabled={running}
+								/>
+							</div>
+						))}
+					</div>
+				</>
+			)}
+			{error && (
+				<div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-800">
+					<AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+					<span>
+						<WriteErrorMessage message={error} />
+					</span>
+				</div>
+			)}
+			<div className="flex flex-wrap items-center gap-2">
+				<Button type="submit" disabled={!website || running} className="flex items-center gap-2 cursor-pointer">
+					{running ? (
+						<>
+							<Spinner /> {step === "start" ? "Detecting location…" : "Analyzing brand…"}
+						</>
+					) : (
+						<>
+							<Play className="h-4 w-4" />
+							{step === "start"
+								? "Analyze Brand"
+								: hasLocation
+									? "Find Competitors and Prompts"
+									: "Continue Without a Location"}
+						</>
+					)}
+				</Button>
+				{running && (
+					<Button type="button" variant="outline" onClick={onCancel} className="cursor-pointer">
+						Cancel
+					</Button>
+				)}
+				{step === "start" && !running && (
+					<Button type="button" variant="ghost" onClick={onEnterManually}>
+						Enter Location Manually
+					</Button>
+				)}
+			</div>
+		</form>
+	);
+}
+
 export default function PromptWizard({ onComplete }: PromptWizardProps) {
 	const { data: brand } = useBrand();
 	const queryClient = useQueryClient();
 	const router = useRouter();
 	const writeError = useWriteErrorMessage();
-	const [reviewing, setReviewing] = useState(false);
+	const [step, setStep] = useState<"start" | "location" | "review">("start");
+	const [location, setLocation] = useState<BrandLocation>({ country: "", city: "", serviceArea: "" });
+	const [locationSourceUrl, setLocationSourceUrl] = useState<string | null>();
+	const research = useRef<Promise<BrandResearchJobRef> | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [submitError, setSubmitError] = useState<string | null>(null);
 	const [isSaving, setIsSaving] = useState(false);
@@ -107,16 +221,40 @@ export default function PromptWizard({ onComplete }: PromptWizardProps) {
 	});
 
 	const brandId = brand?.id;
+	const hasLocation = Object.values(location).some((value) => value.trim());
 
 	const analysis = usePolledBrandJob({
 		queryKey: ["analyze-brand", brandId],
 		start: () => {
 			if (!brand?.id || !brand.website) throw new Error("Brand isn't loaded yet.");
-			return startAnalyzeBrandFn({ data: { brandId: brand.id, website: brand.website, brandName: brand.name } });
+			const stage = step === "start" ? "location" : "analysis";
+			const job = { brandId: brand.id, stage } as const;
+			research.current = startAnalyzeBrandFn({
+				data: {
+					...job,
+					website: brand.website,
+					brandName: brand.name,
+					location: stage === "analysis" ? location : undefined,
+				},
+			}).then(({ jobId }) => ({ ...job, jobId }));
+			return research.current;
 		},
-		poll: () => getAnalyzeBrandStatusFn({ data: { brandId: brandId! } }),
-		cancel: () => cancelAnalyzeBrandFn({ data: { brandId: brandId! } }),
-		onDone: ({ suggestion }) => {
+		poll: async () => {
+			if (!research.current) return { status: "pending" as const };
+			return getAnalyzeBrandStatusFn({ data: await research.current });
+		},
+		cancel: async () => {
+			if (research.current) await cancelAnalyzeBrandFn({ data: await research.current });
+		},
+		onDone: (result) => {
+			if (result.stage === "location") {
+				const { sourceUrl, ...detected } = result.location;
+				setLocation(detected);
+				setLocationSourceUrl(sourceUrl);
+				setStep("location");
+				return;
+			}
+			const { suggestion } = result;
 			const website = brand?.website || suggestion.website || "";
 			setData({
 				brandName: suggestion.brandName || brand?.name || "",
@@ -131,6 +269,7 @@ export default function PromptWizard({ onComplete }: PromptWizardProps) {
 						name: c.name,
 						domains: c.domains,
 						aliases: c.aliases,
+						localEvidence: c.localEvidence,
 						expanded: false,
 					}),
 				),
@@ -138,15 +277,18 @@ export default function PromptWizard({ onComplete }: PromptWizardProps) {
 					newPromptEntry({ value: p.prompt, tags: p.tags, enabled: true }),
 				),
 			});
-			setReviewing(true);
+			setStep("review");
 			trackEvent("onboarding_analyzed", {
 				competitor_count: suggestion.competitors.length,
 				prompt_count: suggestion.suggestedPrompts.length,
 			});
 		},
-		onError: setError,
-		startErrorFallback: "Analysis failed",
-		timeoutMessage: "Brand analysis timed out. Please try again.",
+		onError: (message) => {
+			setError(message);
+			if (step === "start") setStep("location");
+		},
+		startErrorFallback: step === "start" ? "Couldn't start location detection." : "Couldn't start brand analysis.",
+		timeoutMessage: step === "start" ? "Location detection timed out." : "Brand analysis timed out. Please try again.",
 	});
 
 	const handleAnalyze = () => {
@@ -230,44 +372,20 @@ export default function PromptWizard({ onComplete }: PromptWizardProps) {
 		}
 	}, [brand, data, queryClient, router, onComplete, writeError]);
 
-	if (!reviewing) {
+	if (step !== "review") {
 		return (
-			<div className="max-w-2xl mx-auto space-y-3">
-				<p className="text-sm text-muted-foreground">
-					We'll analyze <strong>{brand?.website}</strong> using web search to suggest competitors, additional
-					domains/aliases, and a starter set of AI prompts to track.
-				</p>
-				{error && (
-					<div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-800">
-						<AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-						<span>
-							<WriteErrorMessage message={error} />
-						</span>
-					</div>
-				)}
-				<div className="flex items-center gap-2">
-					<Button
-						onClick={handleAnalyze}
-						disabled={analysis.running}
-						className="flex items-center gap-2 cursor-pointer"
-					>
-						{analysis.running ? (
-							<>
-								<Spinner /> Analyzing brand…
-							</>
-						) : (
-							<>
-								<Play className="h-4 w-4" /> Analyze brand
-							</>
-						)}
-					</Button>
-					{analysis.running && (
-						<Button variant="outline" onClick={analysis.cancel} className="cursor-pointer">
-							Cancel
-						</Button>
-					)}
-				</div>
-			</div>
+			<BrandResearchForm
+				step={step}
+				website={brand?.website ?? undefined}
+				location={location}
+				locationSourceUrl={locationSourceUrl}
+				error={error}
+				running={analysis.running}
+				onLocationChange={setLocation}
+				onAnalyze={handleAnalyze}
+				onCancel={analysis.cancel}
+				onEnterManually={() => setStep("location")}
+			/>
 		);
 	}
 
@@ -323,6 +441,11 @@ export default function PromptWizard({ onComplete }: PromptWizardProps) {
 					<h2 className="text-2xl font-bold">Competitors</h2>
 					<p className="text-muted-foreground">Companies you want tracked alongside your brand.</p>
 				</div>
+				{hasLocation && data.competitors.length === 0 && (
+					<p className="text-sm text-muted-foreground">
+						No competitors with evidence of serving your market were found. You can add any you know below.
+					</p>
+				)}
 				<CompetitorsEditor competitors={data.competitors} onChange={updateCompetitors} disabled={isSaving} />
 			</div>
 

@@ -4,7 +4,7 @@
  */
 
 import type { Meta, StoryObj } from "@storybook/react";
-import type { OnboardingSuggestion } from "@workspace/lib/onboarding";
+import type { BrandLocationSuggestion, OnboardingSuggestion } from "@workspace/lib/onboarding";
 import { useEffect } from "react";
 import { expect, userEvent, waitFor, within } from "storybook/test";
 import BrandOnboarding from "@/components/brand-onboarding";
@@ -13,6 +13,7 @@ import { setMockOnboardingPlatformState } from "./_mocks/server-brands";
 import {
 	setMockOnboardingDelay,
 	setMockOnboardingError,
+	setMockOnboardingLocation,
 	setMockOnboardingSuggestion,
 } from "./_mocks/server-onboarding";
 import { setMockBrand } from "./_mocks/use-brands";
@@ -54,23 +55,27 @@ function useWizardSetup({
 	suggestion,
 	delayMs = 0,
 	error = null,
+	location = null,
 }: {
 	brand: typeof MOCK_BRAND;
 	suggestion: OnboardingSuggestion | null;
 	delayMs?: number;
 	error?: string | null;
+	location?: BrandLocationSuggestion | null;
 }) {
 	useEffect(() => {
 		setMockBrand(brand);
 		setMockOnboardingSuggestion(suggestion);
 		setMockOnboardingDelay(delayMs);
 		setMockOnboardingError(error);
+		setMockOnboardingLocation(location);
 		return () => {
 			setMockOnboardingSuggestion(null);
 			setMockOnboardingDelay(0);
 			setMockOnboardingError(null);
+			setMockOnboardingLocation(null);
 		};
-	}, [brand, suggestion, delayMs, error]);
+	}, [brand, suggestion, delayMs, error, location]);
 }
 
 export default {
@@ -87,6 +92,13 @@ function AutoAnalyze() {
 		return () => window.clearTimeout(id);
 	}, []);
 	return null;
+}
+
+async function analyzeWithoutLocation(canvasElement: HTMLElement) {
+	const canvas = within(canvasElement);
+	await userEvent.click(await canvas.findByRole("button", { name: "Analyze Brand" }));
+	await userEvent.click(await canvas.findByRole("button", { name: "Continue Without a Location" }));
+	return canvas;
 }
 
 /**
@@ -183,15 +195,10 @@ export const Analyzing = () => {
 export const Review: StoryObj = {
 	render: () => {
 		useWizardSetup({ brand: MOCK_BRAND, suggestion: RICH_SUGGESTION });
-		return (
-			<>
-				<PromptWizard onComplete={() => {}} />
-				<AutoAnalyze />
-			</>
-		);
+		return <PromptWizard onComplete={() => {}} />;
 	},
 	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+		const canvas = await analyzeWithoutLocation(canvasElement);
 		await expect(await canvas.findByDisplayValue("Acme")).toBeVisible();
 		await expect(canvas.getAllByDisplayValue("best widgets").length).toBeGreaterThan(0);
 		await expect(
@@ -200,18 +207,61 @@ export const Review: StoryObj = {
 	},
 };
 
-export const ReviewRejectsCoveredDomain: StoryObj = {
+const DETECTED_LOCATION = {
+	country: "Iraq",
+	city: "Erbil",
+	serviceArea: "",
+	sourceUrl: "https://acme.example/contact",
+};
+
+const LOCAL_SUGGESTION = {
+	...RICH_SUGGESTION,
+	competitors: [
+		{
+			name: "Globex",
+			domains: ["globex.example"],
+			aliases: [],
+			localEvidence: {
+				reason: "Delivers widgets across Erbil Governorate.",
+				sourceUrl: "https://globex.example/delivery",
+			},
+		},
+	],
+	suggestedPrompts: [{ prompt: "where to buy widgets in erbil governorate", tags: ["widgets"] }],
+};
+
+export const ConfirmLocalMarket: StoryObj = {
 	render: () => {
-		useWizardSetup({ brand: MOCK_BRAND, suggestion: RICH_SUGGESTION });
-		return (
-			<>
-				<PromptWizard onComplete={() => {}} />
-				<AutoAnalyze />
-			</>
-		);
+		useWizardSetup({ brand: MOCK_BRAND, suggestion: LOCAL_SUGGESTION, location: DETECTED_LOCATION });
+		return <PromptWizard onComplete={() => {}} />;
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
+		await userEvent.click(await canvas.findByRole("button", { name: "Analyze Brand" }));
+		await expect(await canvas.findByLabelText("Country")).toHaveValue("Iraq");
+		await expect(canvas.getByLabelText("City")).toHaveValue("Erbil");
+		await expect(canvas.getByRole("link", { name: "View Location Source" })).toHaveAttribute(
+			"href",
+			DETECTED_LOCATION.sourceUrl,
+		);
+		await expect(canvas.queryByText("Globex")).not.toBeInTheDocument();
+		await userEvent.type(canvas.getByLabelText("Service Area"), "Erbil Governorate");
+		await userEvent.click(canvas.getByRole("button", { name: "Find Competitors and Prompts" }));
+		await expect(await canvas.findByRole("link", { name: "View source for Globex" })).toHaveAttribute(
+			"href",
+			"https://globex.example/delivery",
+		);
+		await expect(canvas.getByDisplayValue("where to buy widgets in erbil governorate")).toBeVisible();
+	},
+};
+
+export const ReviewRejectsCoveredDomain: StoryObj = {
+	render: () => {
+		useWizardSetup({ brand: MOCK_BRAND, suggestion: RICH_SUGGESTION });
+		return <PromptWizard onComplete={() => {}} />;
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = await analyzeWithoutLocation(canvasElement);
 		const documentBody = within(canvasElement.ownerDocument.body);
 
 		await canvas.findByText("Brand details");
@@ -238,15 +288,10 @@ export const ReviewRejectsCoveredDomain: StoryObj = {
 export const ReviewPasteSkipsCoveredDomains: StoryObj = {
 	render: () => {
 		useWizardSetup({ brand: MOCK_BRAND, suggestion: RICH_SUGGESTION });
-		return (
-			<>
-				<PromptWizard onComplete={() => {}} />
-				<AutoAnalyze />
-			</>
-		);
+		return <PromptWizard onComplete={() => {}} />;
 	},
 	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+		const canvas = await analyzeWithoutLocation(canvasElement);
 		const documentBody = within(canvasElement.ownerDocument.body);
 
 		await canvas.findByText("Brand details");
@@ -268,15 +313,10 @@ export const ReviewDropsCoveredSuggestions: StoryObj = {
 			brand: MOCK_BRAND,
 			suggestion: { ...RICH_SUGGESTION, additionalDomains: ["acme.co.uk", "blog.acme.com", "eu.acme.co.uk"] },
 		});
-		return (
-			<>
-				<PromptWizard onComplete={() => {}} />
-				<AutoAnalyze />
-			</>
-		);
+		return <PromptWizard onComplete={() => {}} />;
 	},
 	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+		const canvas = await analyzeWithoutLocation(canvasElement);
 		await canvas.findByText("Brand details");
 		await expect(canvas.findByText("acme.co.uk")).resolves.toBeVisible();
 		expect(canvas.queryByText("blog.acme.com")).toBeNull();
@@ -295,17 +335,12 @@ export const AnalyzeError: StoryObj = {
 			suggestion: RICH_SUGGESTION,
 			error: "Brand analysis failed. Please try again.",
 		});
-		return (
-			<>
-				<PromptWizard onComplete={() => {}} />
-				<AutoAnalyze />
-			</>
-		);
+		return <PromptWizard onComplete={() => {}} />;
 	},
 	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+		const canvas = await analyzeWithoutLocation(canvasElement);
 		await expect(await canvas.findByText("Brand analysis failed. Please try again.")).toBeVisible();
-		await expect(canvas.getByRole("button", { name: /analyze brand/i })).toBeEnabled();
+		await expect(canvas.getByRole("button", { name: "Continue Without a Location" })).toBeEnabled();
 	},
 };
 

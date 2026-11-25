@@ -1,3 +1,4 @@
+import { DETECT_BRAND_LOCATION_JOB_OPTIONS, DETECT_BRAND_LOCATION_QUEUE } from "@workspace/lib/onboarding";
 import { PROCESS_PROMPT_QUEUE, PROMPT_JOB_OPTIONS } from "@workspace/lib/queues/prompt-jobs";
 import { GENERATE_REPORT_QUEUE, REPORT_JOB_OPTIONS } from "@workspace/lib/queues/report-jobs";
 import { PgBoss } from "pg-boss";
@@ -43,6 +44,7 @@ export async function getBoss(): Promise<PgBoss> {
 			retryBackoff: false,
 			expireInSeconds: 60 * 15,
 		});
+		await boss.createQueue(DETECT_BRAND_LOCATION_QUEUE, DETECT_BRAND_LOCATION_JOB_OPTIONS);
 		await boss.createQueue("suggest-prompts", {
 			retryLimit: 1,
 			retryDelay: 10,

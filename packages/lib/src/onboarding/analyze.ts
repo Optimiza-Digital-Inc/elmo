@@ -3,9 +3,11 @@ import { z } from "zod";
 import { wholeWordPattern } from "../mentions";
 import { getWebsiteExcerpt } from "../website-excerpt";
 import { runStructuredResearchPrompt } from "./llm";
+import type { BrandLocation } from "./location";
 import {
 	cleanAndValidateDomain,
 	cleanDomain,
+	cleanSourceUrl,
 	cleanUrl,
 	inferBrandNameFromDomain,
 	uniqueLowercase,
@@ -37,6 +39,13 @@ const competitorSchema = z.object({
 	aliases: z.array(z.string()).describe(`Other names the company is commonly known by. ${ALIAS_GUIDANCE}`),
 });
 
+const localEvidenceSchema = z.object({
+	reason: z
+		.string()
+		.describe("One short sentence explaining the relevant offering and how it serves the target market."),
+	sourceUrl: z.string().describe("Public URL showing that this competitor actually serves the target market."),
+});
+
 export const promptSchema = z.object({
 	prompt: z
 		.string()
@@ -48,7 +57,10 @@ export const promptSchema = z.object({
 		.describe(`1-3 tags per prompt (ideally 1-2), drawn from the shared brand-tailored vocabulary. ${TAG_GUIDANCE}`),
 });
 
-function buildSchema(args: { maxCompetitors: number; maxPrompts: number }) {
+function buildSchema(args: { maxCompetitors: number; maxPrompts: number; local: boolean }) {
+	const competitor: z.ZodType<OnboardingCompetitor> = args.local
+		? competitorSchema.extend({ localEvidence: localEvidenceSchema })
+		: competitorSchema;
 	return z.object({
 		brandName: z
 			.string()
@@ -66,7 +78,7 @@ function buildSchema(args: { maxCompetitors: number; maxPrompts: number }) {
 				`Other names users use for this brand (abbreviations, parent-company names, common misspellings). ${ALIAS_GUIDANCE} Empty if none are commonly used.`,
 			),
 		competitors: z
-			.array(competitorSchema)
+			.array(competitor)
 			.describe(
 				`Up to ${args.maxCompetitors} direct competitors that sell similar products to a similar audience. Empty if uncertain.`,
 			),
@@ -84,6 +96,7 @@ export interface OnboardingCompetitor {
 	name: string;
 	domains: string[];
 	aliases: string[];
+	localEvidence?: z.infer<typeof localEvidenceSchema>;
 }
 
 export interface OnboardingPrompt {
@@ -104,6 +117,7 @@ export interface AnalyzeBrandOptions {
 	/** A URL with a path is researched as given, for sub-brands; mentions always match the hostname. */
 	website: string;
 	brandName?: string;
+	location?: BrandLocation;
 	/** 0 disables competitor generation entirely. */
 	maxCompetitors?: number;
 	/** 0 disables prompt generation entirely. */
@@ -125,10 +139,17 @@ export interface AnalysisContext {
 	schema: ReturnType<typeof buildSchema>;
 	maxCompetitors: number;
 	maxPrompts: number;
+	local: boolean;
 }
 
 export async function buildAnalysisContext(options: AnalyzeBrandOptions): Promise<AnalysisContext> {
-	const { website, brandName, maxCompetitors = DEFAULT_MAX_COMPETITORS, maxPrompts = DEFAULT_MAX_PROMPTS } = options;
+	const {
+		website,
+		brandName,
+		location,
+		maxCompetitors = DEFAULT_MAX_COMPETITORS,
+		maxPrompts = DEFAULT_MAX_PROMPTS,
+	} = options;
 
 	const normalizedWebsite = cleanDomain(website);
 	const analysisUrl = cleanUrl(website);
@@ -139,6 +160,10 @@ export async function buildAnalysisContext(options: AnalyzeBrandOptions): Promis
 	const providedBrandName = brandName?.trim() || undefined;
 	const brandNameHint = providedBrandName ?? inferBrandNameFromDomain(normalizedWebsite);
 	const websiteExcerpt = await safeGetExcerpt(analysisUrl);
+	const targetMarket = location
+		? uniqueTrim([location.serviceArea.trim() || location.city, location.country]).join(", ")
+		: "";
+	const local = targetMarket !== "";
 
 	const prompt = buildPrompt({
 		analysisUrl,
@@ -146,6 +171,7 @@ export async function buildAnalysisContext(options: AnalyzeBrandOptions): Promis
 		brandNameHint,
 		brandNameWasProvided: providedBrandName !== undefined,
 		websiteExcerpt,
+		targetMarket,
 		includeCompetitors: maxCompetitors > 0,
 		includePrompts: maxPrompts > 0,
 	});
@@ -156,9 +182,10 @@ export async function buildAnalysisContext(options: AnalyzeBrandOptions): Promis
 		brandNameHint,
 		...(providedBrandName !== undefined && { providedBrandName }),
 		prompt,
-		schema: buildSchema({ maxCompetitors, maxPrompts }),
+		schema: buildSchema({ maxCompetitors, maxPrompts, local: local && maxCompetitors > 0 }),
 		maxCompetitors,
 		maxPrompts,
+		local,
 	};
 }
 
@@ -172,6 +199,7 @@ export function normalizeAnalysisResult(raw: RawSuggestion, ctx: AnalysisContext
 		includePrompts: ctx.maxPrompts > 0,
 		maxCompetitors: ctx.maxCompetitors,
 		maxPrompts: ctx.maxPrompts,
+		local: ctx.local,
 	});
 }
 
@@ -228,6 +256,7 @@ function buildPrompt(args: {
 	brandNameHint: string;
 	brandNameWasProvided: boolean;
 	websiteExcerpt: string;
+	targetMarket: string;
 	includeCompetitors: boolean;
 	includePrompts: boolean;
 }): string {
@@ -245,11 +274,16 @@ function buildPrompt(args: {
 	const skipNotes: string[] = [];
 	if (!args.includeCompetitors) skipNotes.push("Return an empty array for competitors.");
 	if (!args.includePrompts) skipNotes.push("Return an empty array for suggestedPrompts.");
+	const marketNote = args.targetMarket
+		? `\nUser-confirmed target market: ${JSON.stringify(args.targetMarket)}. Use it as the customer market, even if the business is headquartered elsewhere.
+Include only direct competitors with a similar offering and public evidence of a branch, service coverage, or delivery in that market. A business can be based elsewhere if it serves these customers. Cite the public page showing coverage for each suggestion and return fewer competitors when evidence is sparse.
+Generate prompts in the language customers in this market are likely to use, naming the target place naturally in local discovery queries. Keep most prompts unbranded.\n`
+		: "";
 
 	return `Analyze the brand at ${args.analysisUrl}.
 
 ${nameLine}
-${scopeNote}${excerptBlock}
+${scopeNote}${marketNote}${excerptBlock}
 Use web search to verify facts. Never invent information — return empty arrays when uncertain.
 
 You MUST return the structured JSON object — even if you can find nothing about this brand. In that case set brandName to the likely name above and return empty arrays for every other field. Refusing to produce JSON, or replying with prose explaining what you don't know, is a failure mode; an object with mostly-empty arrays is the correct answer when information is genuinely unavailable.${skipNotes.length > 0 ? `\n\n${skipNotes.join(" ")}` : ""}`;
@@ -264,6 +298,7 @@ function normalize(args: {
 	includePrompts: boolean;
 	maxCompetitors: number;
 	maxPrompts: number;
+	local: boolean;
 }): OnboardingSuggestion {
 	const {
 		raw,
@@ -274,6 +309,7 @@ function normalize(args: {
 		includePrompts,
 		maxCompetitors,
 		maxPrompts,
+		local,
 	} = args;
 
 	// For a sub-brand the model tends to answer with the parent ("Nike Golf" →
@@ -294,7 +330,9 @@ function normalize(args: {
 		website,
 		additionalDomains: dedupedAdditionalDomains,
 		aliases,
-		competitors: includeCompetitors ? normalizeCompetitors(raw.competitors ?? [], ownedDomains, maxCompetitors) : [],
+		competitors: includeCompetitors
+			? normalizeCompetitors(raw.competitors ?? [], ownedDomains, maxCompetitors, local)
+			: [],
 		suggestedPrompts: includePrompts ? normalizePrompts(raw.suggestedPrompts ?? [], maxPrompts) : [],
 	};
 }
@@ -302,17 +340,27 @@ function normalize(args: {
 /** At most this many topic tags survive per suggested prompt. */
 const MAX_PROMPT_TAGS = 3;
 
+function normalizeLocalEvidence(evidence: OnboardingCompetitor["localEvidence"]) {
+	if (!evidence) return undefined;
+	const sourceUrl = cleanSourceUrl(evidence.sourceUrl);
+	const reason = evidence.reason.trim();
+	return sourceUrl && reason ? { sourceUrl, reason } : undefined;
+}
+
 /** Two entries sharing a domain are the same company under two names. */
 function normalizeCompetitors(
 	raw: RawSuggestion["competitors"],
 	ownedDomains: Set<string>,
 	maxCompetitors: number,
+	local: boolean,
 ): OnboardingCompetitor[] {
 	const competitors: OnboardingCompetitor[] = [];
 	const claimedDomains = new Set<string>();
 
 	for (const competitor of raw ?? []) {
 		if (competitors.length >= maxCompetitors) break;
+		const localEvidence = normalizeLocalEvidence(competitor.localEvidence);
+		if (local && !localEvidence) continue;
 		const domains = uniqueLowercase(
 			(competitor.domains ?? [])
 				.map((domain) => cleanAndValidateDomain(domain))
@@ -322,7 +370,12 @@ function normalizeCompetitors(
 		for (const domain of domains) claimedDomains.add(domain);
 
 		const name = competitor.name.trim();
-		competitors.push({ name, domains, aliases: filterRedundantAliases(uniqueTrim(competitor.aliases ?? []), name) });
+		competitors.push({
+			name,
+			domains,
+			aliases: filterRedundantAliases(uniqueTrim(competitor.aliases ?? []), name),
+			...(localEvidence && { localEvidence }),
+		});
 	}
 
 	return competitors;

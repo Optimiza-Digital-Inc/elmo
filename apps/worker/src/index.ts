@@ -3,6 +3,7 @@ import { assertRequiredEnv } from "@workspace/config/env";
 import { parseScrapeTargets } from "@workspace/config/scrape-targets";
 import { getDeploymentFeatures } from "@workspace/deployment";
 import { db } from "@workspace/lib/db/db";
+import { DETECT_BRAND_LOCATION_JOB_OPTIONS, DETECT_BRAND_LOCATION_QUEUE } from "@workspace/lib/onboarding";
 import { getProvider, validateScrapeTargets } from "@workspace/lib/providers";
 import { PROCESS_PROMPT_QUEUE, PROMPT_JOB_OPTIONS } from "@workspace/lib/queues/prompt-jobs";
 import { GENERATE_REPORT_QUEUE, REPORT_JOB_OPTIONS } from "@workspace/lib/queues/report-jobs";
@@ -74,6 +75,7 @@ async function main() {
 		retryBackoff: false,
 		expireInSeconds: 60 * 15, // 15 minute timeout for onboarding brand analysis
 	});
+	await boss.createQueue(DETECT_BRAND_LOCATION_QUEUE, DETECT_BRAND_LOCATION_JOB_OPTIONS);
 	await boss.createQueue("suggest-prompts", {
 		retryLimit: 1,
 		retryDelay: 10,

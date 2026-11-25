@@ -1,10 +1,8 @@
 /**
  * The web app enqueues the work and then polls the job's result *by brand* —
- * the brand id is the org id, so callers prove access to the brand and we
- * never hand a job's output to someone outside that org.
+ * callers prove access to the brand before reading a job's output.
  *
- * Jobs are found by the brand id in their data rather than by job id, so the
- * client never has to round-trip an opaque id.
+ * Callers can select a specific job within a brand or the most recent one.
  */
 
 import type { JobWithMetadata } from "pg-boss";
@@ -31,6 +29,13 @@ export async function latestBrandJob(queue: string, brandId: string): Promise<Br
 	return latest;
 }
 
+async function findBrandJob(queue: string, brandId: string, jobId?: string): Promise<BrandJob | undefined> {
+	if (!jobId) return latestBrandJob(queue, brandId);
+	const boss = await getBoss();
+	const [job] = await boss.findJobs<Record<string, unknown>>(queue, { id: jobId, data: { brandId } });
+	return job;
+}
+
 /**
  * `failureMessage` is shown to the user when a job ends in a failed/cancelled
  * state. The real error (provider messages, stack traces) is already captured
@@ -40,12 +45,11 @@ export async function readBrandJob<T>(
 	queue: string,
 	brandId: string,
 	failureMessage: string,
+	jobId?: string,
 ): Promise<BrandJobStatus<T>> {
-	const job = await latestBrandJob(queue, brandId);
+	const job = await findBrandJob(queue, brandId, jobId);
 
-	// No job yet — the enqueue may not be visible, or the worker hasn't picked
-	// it up. Either way the client should keep polling.
-	if (!job) return { status: "pending" };
+	if (!job) return jobId ? { status: "failed", error: failureMessage } : { status: "pending" };
 	if (job.state === "completed") return { status: "done", output: job.output as T };
 	if (job.state === "failed" || job.state === "cancelled") {
 		console.error(`[${queue}] job ended without a result`, { brandId, jobId: job.id, state: job.state });
@@ -54,8 +58,8 @@ export async function readBrandJob<T>(
 	return { status: "pending" };
 }
 
-export async function cancelLatestBrandJob(queue: string, brandId: string): Promise<void> {
-	const job = await latestBrandJob(queue, brandId);
+export async function cancelBrandJob(queue: string, brandId: string, jobId?: string): Promise<void> {
+	const job = await findBrandJob(queue, brandId, jobId);
 	if (!job || !IN_FLIGHT_STATES.has(job.state)) return;
 	const boss = await getBoss();
 	try {

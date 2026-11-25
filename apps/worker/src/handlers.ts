@@ -1,11 +1,15 @@
 import * as Sentry from "@sentry/node";
 import { getDeploymentFeatures } from "@workspace/deployment";
-import type { OnboardingSuggestion } from "@workspace/lib/onboarding";
+import {
+	type BrandLocationSuggestion,
+	DETECT_BRAND_LOCATION_QUEUE,
+	type OnboardingSuggestion,
+} from "@workspace/lib/onboarding";
 import { PROCESS_PROMPT_QUEUE } from "@workspace/lib/queues/prompt-jobs";
 import { GENERATE_REPORT_QUEUE } from "@workspace/lib/queues/report-jobs";
 import { REFRESH_ROLLUPS_QUEUE, ROLLUP_CATCH_UP_QUEUE } from "@workspace/lib/rollups/constants";
 import type { Job, PgBoss } from "pg-boss";
-import { type AnalyzeBrandData, analyzeBrandJob } from "./jobs/analyze-brand";
+import { type AnalyzeBrandData, analyzeBrandJob, detectBrandLocationJob } from "./jobs/analyze-brand";
 import { DERIVE_RUNS_QUEUE, type DeriveRunsData, deriveRunsJob } from "./jobs/derive-runs";
 import { type GenerateReportData, generateReportJob } from "./jobs/generate-report";
 import { type ProcessPromptData, processPromptJob } from "./jobs/process-prompt";
@@ -101,14 +105,19 @@ export async function registerHandlers(boss: PgBoss): Promise<void> {
 		console.log("Registered handler: generate-report");
 	}
 
-	// batchSize: 1 keeps the returned suggestion mapped 1:1 to a single job's
-	// output, which the web app reads back via getJobById.
+	// A research result belongs to one job, so each handler processes one job per batch.
 	await boss.work<AnalyzeBrandData, OnboardingSuggestion>(
 		"analyze-brand",
 		{ batchSize: 1, localConcurrency: 2 },
 		withSentry("analyze-brand", analyzeBrandJob, { sampleRate: JOB_TRACE_RATE.rare }),
 	);
 	console.log("Registered handler: analyze-brand");
+	await boss.work<AnalyzeBrandData, BrandLocationSuggestion>(
+		DETECT_BRAND_LOCATION_QUEUE,
+		{ batchSize: 1, localConcurrency: 2 },
+		withSentry(DETECT_BRAND_LOCATION_QUEUE, detectBrandLocationJob, { sampleRate: JOB_TRACE_RATE.rare }),
+	);
+	console.log(`Registered handler: ${DETECT_BRAND_LOCATION_QUEUE}`);
 
 	await boss.work<SuggestPromptsData, SuggestPromptsResult>(
 		"suggest-prompts",

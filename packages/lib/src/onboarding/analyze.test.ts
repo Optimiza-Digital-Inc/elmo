@@ -15,12 +15,83 @@ vi.mock("../website-excerpt", () => ({
 import { getWebsiteExcerpt } from "../website-excerpt";
 import { analyzeBrand, buildAnalysisContext } from "./analyze";
 import { runStructuredResearchPrompt } from "./llm";
+import { detectBrandLocation } from "./location";
 
 afterEach(() => {
 	vi.clearAllMocks();
 });
 
+describe("detectBrandLocation", () => {
+	it("returns a sourced country and city when coverage is unknown", async () => {
+		vi.mocked(runStructuredResearchPrompt).mockResolvedValueOnce({
+			country: " Iraq ",
+			city: "Erbil",
+			serviceArea: "",
+			sourceUrl: "https://clinic.example/contact",
+		});
+
+		await expect(detectBrandLocation({ website: "clinic.example", brandName: "Example Clinic" })).resolves.toEqual({
+			country: "Iraq",
+			city: "Erbil",
+			serviceArea: "",
+			sourceUrl: "https://clinic.example/contact",
+		});
+	});
+
+	it("leaves the location blank when research supplies no usable source", async () => {
+		vi.mocked(runStructuredResearchPrompt).mockResolvedValueOnce({
+			country: "Iraq",
+			city: "Erbil",
+			serviceArea: "Erbil Governorate",
+			sourceUrl: "",
+		});
+
+		await expect(detectBrandLocation({ website: "clinic.example" })).resolves.toEqual({
+			country: "",
+			city: "",
+			serviceArea: "",
+			sourceUrl: null,
+		});
+	});
+});
+
 describe("analyzeBrand", () => {
+	it("uses the confirmed coverage for research and omits competitors without a usable source", async () => {
+		vi.mocked(runStructuredResearchPrompt).mockResolvedValueOnce({
+			brandName: "Example Clinic",
+			additionalDomains: [],
+			aliases: [],
+			competitors: [
+				{
+					name: "Neighbor Clinic",
+					domains: ["neighbor.example"],
+					aliases: [],
+					localEvidence: { reason: "Offers dental care in the area.", sourceUrl: "https://neighbor.example/locations" },
+				},
+				{
+					name: "Global Clinic",
+					domains: ["global.example"],
+					aliases: [],
+					localEvidence: { reason: "", sourceUrl: "" },
+				},
+			],
+			suggestedPrompts: [{ prompt: "emergency dentist in erbil governorate", tags: ["emergency"] }],
+		});
+
+		const result = await analyzeBrand({
+			website: "clinic.example",
+			location: { country: "Iraq", city: "Erbil", serviceArea: "Erbil Governorate" },
+		});
+
+		expect(vi.mocked(runStructuredResearchPrompt).mock.calls[0]?.[0]).toContain('"Erbil Governorate, Iraq"');
+		expect(result.competitors).toMatchObject([
+			{ name: "Neighbor Clinic", localEvidence: { sourceUrl: "https://neighbor.example/locations" } },
+		]);
+		expect(result.suggestedPrompts).toEqual([
+			{ prompt: "emergency dentist in erbil governorate", tags: ["emergency"] },
+		]);
+	});
+
 	it("uses the full page URL for analysis while retaining the domain identity", async () => {
 		const pageUrl = "https://www.nike.com/golf?category=clubs#featured";
 		vi.mocked(getWebsiteExcerpt).mockResolvedValueOnce("Nike Golf page excerpt");

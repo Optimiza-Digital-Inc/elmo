@@ -241,11 +241,11 @@ function ResearchBrandData({ brandId, clientConfig }: { brandId: string; clientC
 			<div className="space-y-2">
 				<h2 className="text-2xl font-bold">Research Brand Data</h2>
 				<p className="text-muted-foreground text-balance">
-					We will analyze your website and find the best generative AI prompts to track. This process may take a couple
-					of minutes.
+					Find competitors and AI tracking prompts for your market. Research may take a couple of minutes.
 				</p>
 			</div>
 			<PromptWizard
+				key={brandId}
 				onComplete={() => {
 					const template = clientConfig?.branding.onboardingRedirectUrlTemplate;
 					if (template) window.location.href = template.replace("{brandId}", brandId);

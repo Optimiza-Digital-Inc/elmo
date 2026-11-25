@@ -10,6 +10,7 @@
 import { IconInfoCircle } from "@tabler/icons-react";
 import { cleanAndValidateDomain } from "@workspace/lib/citations/domain-categories";
 import { MAX_COMPETITORS } from "@workspace/lib/constants";
+import type { OnboardingCompetitor } from "@workspace/lib/onboarding";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
@@ -25,6 +26,7 @@ export interface CompetitorEntry {
 	name: string;
 	domains: string[];
 	aliases: string[];
+	localEvidence?: OnboardingCompetitor["localEvidence"];
 	expanded: boolean;
 }
 
@@ -40,6 +42,7 @@ export function newCompetitorEntry(partial?: Partial<CompetitorEntry>): Competit
 		name: partial?.name ?? "",
 		domains: partial?.domains ?? [],
 		aliases: partial?.aliases ?? [],
+		localEvidence: partial?.localEvidence,
 		expanded: partial?.expanded ?? true,
 	};
 }
@@ -76,6 +79,20 @@ export function CompetitorsEditor({ competitors, onChange, disabled }: Competito
 							)}
 							{competitor.domains.some(Boolean) && (
 								<span className="text-xs text-muted-foreground ml-2">{competitor.domains.filter(Boolean)[0]}</span>
+							)}
+							{competitor.localEvidence && (
+								<p className="mt-1 text-xs text-muted-foreground">
+									{competitor.localEvidence.reason}{" "}
+									<a
+										className="text-primary underline"
+										href={competitor.localEvidence.sourceUrl}
+										target="_blank"
+										rel="noreferrer"
+										aria-label={`View source for ${competitor.name}`}
+									>
+										View Source
+									</a>
+								</p>
 							)}
 						</div>
 						<Button
@@ -118,7 +135,7 @@ export function CompetitorsEditor({ competitors, onChange, disabled }: Competito
 								<Input
 									type="text"
 									value={competitor.name}
-									onChange={(e) => update(competitor._key, { name: e.target.value })}
+									onChange={(e) => update(competitor._key, { name: e.target.value, localEvidence: undefined })}
 									placeholder="Competitor name"
 									className="bg-background"
 									disabled={disabled}
@@ -140,7 +157,7 @@ export function CompetitorsEditor({ competitors, onChange, disabled }: Competito
 								</Label>
 								<TagsInput
 									value={competitor.domains.filter(Boolean)}
-									onValueChange={(values) => update(competitor._key, { domains: values })}
+									onValueChange={(values) => update(competitor._key, { domains: values, localEvidence: undefined })}
 									placeholder="Add domain..."
 									maxItems={10}
 									normalizeValue={(raw) => cleanAndValidateDomain(raw) ?? raw.trim()}

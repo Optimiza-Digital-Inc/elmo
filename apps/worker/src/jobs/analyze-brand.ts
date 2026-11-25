@@ -1,13 +1,14 @@
-import { analyzeBrand, type OnboardingSuggestion } from "@workspace/lib/onboarding";
+import {
+	type AnalyzeBrandOptions,
+	analyzeBrand,
+	type BrandLocationSuggestion,
+	detectBrandLocation,
+	type OnboardingSuggestion,
+} from "@workspace/lib/onboarding";
 import type { Job } from "pg-boss";
 
-export interface AnalyzeBrandData {
-	/** Brand id (== org id) the analysis belongs to; the web app reads results back by brand. */
+export interface AnalyzeBrandData extends AnalyzeBrandOptions {
 	brandId: string;
-	website: string;
-	brandName?: string;
-	maxCompetitors?: number;
-	maxPrompts?: number;
 }
 
 /**
@@ -26,6 +27,11 @@ export async function analyzeBrandJob(jobs: Job<AnalyzeBrandData>[]): Promise<On
 		throw new Error("analyze-brand handler received an empty batch");
 	}
 
-	const { website, brandName, maxCompetitors, maxPrompts } = job.data;
-	return analyzeBrand({ website, brandName, maxCompetitors, maxPrompts });
+	return analyzeBrand(job.data);
+}
+
+export async function detectBrandLocationJob(jobs: Job<AnalyzeBrandData>[]): Promise<BrandLocationSuggestion> {
+	const [job] = jobs;
+	if (!job) throw new Error("detect-brand-location handler received an empty batch");
+	return detectBrandLocation(job.data);
 }
