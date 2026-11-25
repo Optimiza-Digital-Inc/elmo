@@ -44,9 +44,9 @@ interface WizardData {
 const DOMAIN_PASTE_SPLITTER = /[\n,\t]+/;
 const normalizeDomain = (raw: string) => cleanAndValidateDomain(raw) ?? raw.trim();
 const LOCATION_FIELDS = [
-	{ key: "country", label: "Country", placeholder: "Iraq" },
-	{ key: "city", label: "City", placeholder: "Erbil" },
-	{ key: "serviceArea", label: "Service Area", placeholder: "Erbil Governorate" },
+	{ key: "country", label: "Country", placeholder: "Enter a Country" },
+	{ key: "city", label: "City", placeholder: "Enter a City" },
+	{ key: "serviceArea", label: "Service Area", placeholder: "Enter the Areas You Serve" },
 ] as const;
 
 const EditableTagsInput = memo(
