@@ -4,6 +4,7 @@
  */
 
 import type { Meta, StoryObj } from "@storybook/react";
+import { MAX_COMPETITORS } from "@workspace/lib/constants";
 import type { BrandLocationSuggestion, OnboardingSuggestion } from "@workspace/lib/onboarding";
 import { useEffect } from "react";
 import { expect, userEvent, waitFor, within } from "storybook/test";
@@ -108,7 +109,7 @@ async function analyzeWithoutLocation(canvasElement: HTMLElement) {
  */
 export const Setup = () => {
 	setMockOnboardingPlatformState(null);
-	return <BrandOnboarding brandId="mock-brand-id" brandName="Acme" platformState={null} />;
+	return <BrandOnboarding organizationSlug="mock-org" brandId="mock-brand-id" brandName="Acme" platformState={null} />;
 };
 
 const CLOUD_PLATFORM_STATE = {
@@ -131,12 +132,19 @@ const CLOUD_PLATFORM_STATE = {
 export const SetupPlatformStep: StoryObj = {
 	render: () => {
 		setMockOnboardingPlatformState(CLOUD_PLATFORM_STATE);
-		return <BrandOnboarding brandId="mock-brand-id" brandName="Acme" platformState={CLOUD_PLATFORM_STATE} />;
+		return (
+			<BrandOnboarding
+				organizationSlug="mock-org"
+				brandId="mock-brand-id"
+				brandName="Acme"
+				platformState={CLOUD_PLATFORM_STATE}
+			/>
+		);
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 
-		await userEvent.type(await canvas.findByLabelText("Website"), "acme.com");
+		await userEvent.type(await canvas.findByLabelText("Website (Optional)"), "acme.com");
 		await userEvent.click(await canvas.findByRole("button", { name: /continue/i }));
 
 		expect(await canvas.findByRole("checkbox", { name: /chatgpt/i })).toBeChecked();
@@ -161,18 +169,54 @@ export const SetupSinglePlatformPlan: StoryObj = {
 			defaultSelected: ["chatgpt"],
 		};
 		setMockOnboardingPlatformState(state);
-		return <BrandOnboarding brandId="mock-brand-id" brandName="Acme" platformState={state} />;
+		return (
+			<BrandOnboarding organizationSlug="mock-org" brandId="mock-brand-id" brandName="Acme" platformState={state} />
+		);
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 
-		await userEvent.type(await canvas.findByLabelText("Website"), "acme.com");
+		await userEvent.type(await canvas.findByLabelText("Website (Optional)"), "acme.com");
 		await userEvent.click(await canvas.findByRole("button", { name: /continue/i }));
 
 		const checkbox = await canvas.findByRole("checkbox", { name: /chatgpt/i });
 		expect(checkbox).toBeChecked();
 		expect(checkbox).toHaveAttribute("aria-disabled", "true");
 		expect(canvas.getByRole("button", { name: /complete setup/i })).toBeEnabled();
+	},
+};
+
+export const SetupWithProfileLink: StoryObj = {
+	render: () => (
+		<BrandOnboarding organizationSlug="mock-org" brandId="mock-brand-id" brandName="Acme" platformState={null} />
+	),
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const website = await canvas.findByLabelText("Website (Optional)");
+		const profileLink = "https://maps.app.goo.gl/ExampleBusiness";
+		await userEvent.type(website, profileLink);
+		await userEvent.tab();
+		expect(website).toHaveValue("");
+		await expect(canvas.findByText(profileLink)).resolves.toBeVisible();
+		expect(canvas.getByRole("status")).toHaveTextContent("Moved to Profile Links.");
+		expect(canvas.getByRole("button", { name: "Complete Setup" })).toBeEnabled();
+	},
+};
+
+export const ManualSetupWithoutWebsite: StoryObj = {
+	render: () => {
+		setMockBrand({ ...MOCK_BRAND, website: null });
+		return <PromptWizard onComplete={() => {}} />;
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await userEvent.click(await canvas.findByRole("button", { name: "Set Up Manually" }));
+		expect(await canvas.findByDisplayValue("Acme")).toBeVisible();
+		expect(canvas.getByLabelText("Website (Optional)")).toHaveValue("");
+		await userEvent.click(canvas.getByRole("button", { name: "Add Competitor" }));
+		await userEvent.type(canvas.getByPlaceholderText("Competitor name"), "Example Cake Shop");
+		expect(canvas.getByText(`1/${MAX_COMPETITORS}`)).toBeVisible();
+		expect(canvas.getByRole("button", { name: "Finish Setup" })).toBeEnabled();
 	},
 };
 
@@ -202,7 +246,7 @@ export const Review: StoryObj = {
 		await expect(await canvas.findByDisplayValue("Acme")).toBeVisible();
 		await expect(canvas.getAllByDisplayValue("best widgets").length).toBeGreaterThan(0);
 		await expect(
-			canvas.getByRole("button", { name: `Start tracking (${RICH_SUGGESTION.suggestedPrompts.length} new prompts)` }),
+			canvas.getByRole("button", { name: `Start Tracking (${RICH_SUGGESTION.suggestedPrompts.length} New Prompts)` }),
 		).toBeEnabled();
 	},
 };
@@ -251,7 +295,7 @@ export const ConfirmLocalMarket: StoryObj = {
 			"href",
 			"https://globex.example/delivery",
 		);
-		await expect(canvas.getByDisplayValue("where to buy widgets in erbil governorate")).toBeVisible();
+		expect(canvas.getAllByDisplayValue("where to buy widgets in erbil governorate").length).toBeGreaterThan(0);
 	},
 };
 
@@ -265,8 +309,7 @@ export const ReviewRejectsCoveredDomain: StoryObj = {
 		const documentBody = within(canvasElement.ownerDocument.body);
 
 		await canvas.findByText("Brand details");
-		// Brand name and website are plain inputs, so domains is the first combobox.
-		const [domainsInput] = canvas.getAllByRole("combobox");
+		const domainsInput = within(canvas.getByRole("group", { name: "Additional Domains" })).getByRole("combobox");
 		await userEvent.click(domainsInput);
 
 		const search = await documentBody.findByPlaceholderText("Add domain...");
@@ -295,7 +338,7 @@ export const ReviewPasteSkipsCoveredDomains: StoryObj = {
 		const documentBody = within(canvasElement.ownerDocument.body);
 
 		await canvas.findByText("Brand details");
-		const [domainsInput] = canvas.getAllByRole("combobox");
+		const domainsInput = within(canvas.getByRole("group", { name: "Additional Domains" })).getByRole("combobox");
 		await userEvent.click(domainsInput);
 		await userEvent.click(await documentBody.findByPlaceholderText("Add domain..."));
 		await userEvent.paste("blog.acme.com, acme.io, shop.acme.io");

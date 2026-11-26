@@ -10,6 +10,7 @@ import { Spinner } from "@workspace/ui/components/spinner";
 import { TagsInput } from "@workspace/ui/components/tags-input";
 import { AlertCircle, Play, Rocket } from "lucide-react";
 import { memo, useCallback, useMemo, useRef, useState } from "react";
+import { BusinessLinkFields, type BusinessLinkValues } from "@/components/business-link-fields";
 import { type CompetitorEntry, CompetitorsEditor, newCompetitorEntry } from "@/components/competitors-editor";
 import { type EditablePrompt, newPromptEntry, PromptsListEditor } from "@/components/prompts-list-editor";
 import { WriteErrorMessage } from "@/components/write-error-message";
@@ -19,6 +20,7 @@ import { dashboardKeys } from "@/hooks/use-dashboard-summary";
 import { usePolledBrandJob } from "@/hooks/use-polled-brand-job";
 import { promptsSummaryKeys } from "@/hooks/use-prompts-summary";
 import type { BrandResearchJobRef } from "@/lib/analyze-brand-job";
+import { isSharedDomainInput, profileLinkNeedsReview } from "@/lib/business-links";
 import { trackEvent } from "@/lib/posthog";
 import { useWriteErrorMessage } from "@/lib/write-errors";
 import {
@@ -32,9 +34,8 @@ interface PromptWizardProps {
 	onComplete: () => void;
 }
 
-interface WizardData {
+interface WizardData extends BusinessLinkValues {
 	brandName: string;
-	website: string;
 	additionalDomains: string[];
 	aliases: string[];
 	competitors: CompetitorEntry[];
@@ -42,7 +43,8 @@ interface WizardData {
 }
 
 const DOMAIN_PASTE_SPLITTER = /[\n,\t]+/;
-const normalizeDomain = (raw: string) => cleanAndValidateDomain(raw) ?? raw.trim();
+const normalizeDomain = (raw: string) =>
+	isSharedDomainInput(raw) ? raw.trim() : (cleanAndValidateDomain(raw) ?? raw.trim());
 const LOCATION_FIELDS = [
 	{ key: "country", label: "Country", placeholder: "Enter a Country" },
 	{ key: "city", label: "City", placeholder: "Enter a City" },
@@ -89,9 +91,53 @@ const EditableTagsInput = memo(
 );
 EditableTagsInput.displayName = "EditableTagsInput";
 
+function MarketFields({
+	location,
+	locationSourceUrl,
+	running,
+	onLocationChange,
+}: {
+	location: BrandLocation;
+	locationSourceUrl: string | null | undefined;
+	running: boolean;
+	onLocationChange: (location: BrandLocation) => void;
+}) {
+	return (
+		<>
+			<h3 className="text-xl font-semibold">Confirm Your Market</h3>
+			<p className="text-sm text-muted-foreground">
+				Enter where you serve customers. If you leave the service area blank, we'll use the city or country you provide.
+			</p>
+			{locationSourceUrl && (
+				<a className="text-sm text-primary underline" href={locationSourceUrl} target="_blank" rel="noreferrer">
+					View Location Source
+				</a>
+			)}
+			{locationSourceUrl === null && (
+				<p className="text-sm text-muted-foreground">We couldn't confirm a location from public sources.</p>
+			)}
+			<div className="grid gap-3 sm:grid-cols-2">
+				{LOCATION_FIELDS.map(({ key, label, placeholder }) => (
+					<div key={key} className={key === "serviceArea" ? "space-y-1.5 sm:col-span-2" : "space-y-1.5"}>
+						<Label htmlFor={`brand-${key}`}>{label}</Label>
+						<Input
+							id={`brand-${key}`}
+							value={location[key]}
+							onChange={(event) => onLocationChange({ ...location, [key]: event.target.value })}
+							placeholder={placeholder}
+							maxLength={200}
+							disabled={running}
+						/>
+					</div>
+				))}
+			</div>
+		</>
+	);
+}
+
 function BrandResearchForm({
 	step,
-	website,
+	researchUrl,
 	location,
 	locationSourceUrl,
 	error,
@@ -100,9 +146,11 @@ function BrandResearchForm({
 	onAnalyze,
 	onCancel,
 	onEnterManually,
+	onSetUpManually,
 }: {
 	step: "start" | "location";
-	website: string | undefined;
+	researchUrl: string | undefined;
+	onSetUpManually?: () => void;
 	location: BrandLocation;
 	locationSourceUrl: string | null | undefined;
 	error: string | null;
@@ -113,51 +161,37 @@ function BrandResearchForm({
 	onEnterManually: () => void;
 }) {
 	const hasLocation = Object.values(location).some((value) => value.trim());
+	const initialStep = step === "start";
+	const progressLabel = initialStep ? "Detecting location…" : "Analyzing brand…";
+	const submitLabel = initialStep
+		? "Analyze Brand"
+		: hasLocation
+			? "Find Competitors and Prompts"
+			: "Continue Without a Location";
+	const canSetUpManually = onSetUpManually && !running;
+	const manualVariant = researchUrl ? "outline" : "default";
 
 	return (
 		<form
 			className="max-w-2xl mx-auto space-y-3"
 			onSubmit={(event) => {
 				event.preventDefault();
-				if (!running && website) onAnalyze();
+				if (!running && researchUrl) onAnalyze();
 			}}
 		>
-			{step === "start" ? (
+			{initialStep ? (
 				<p className="text-sm text-muted-foreground">
-					We'll look up where <strong>{website}</strong> serves customers so you can confirm the market before we
-					suggest competitors and AI tracking prompts.
+					{researchUrl
+						? "We'll use your website or profile to look up your market and suggest competitors and prompts."
+						: "Add the competitors and prompts you want to track."}
 				</p>
 			) : (
-				<>
-					<h3 className="text-xl font-semibold">Confirm Your Market</h3>
-					<p className="text-sm text-muted-foreground">
-						Enter where you serve customers. If you leave the service area blank, we'll use the city or country you
-						provide.
-					</p>
-					{locationSourceUrl && (
-						<a className="text-sm text-primary underline" href={locationSourceUrl} target="_blank" rel="noreferrer">
-							View Location Source
-						</a>
-					)}
-					{locationSourceUrl === null && (
-						<p className="text-sm text-muted-foreground">We couldn't confirm a location from public sources.</p>
-					)}
-					<div className="grid gap-3 sm:grid-cols-2">
-						{LOCATION_FIELDS.map(({ key, label, placeholder }) => (
-							<div key={key} className={key === "serviceArea" ? "space-y-1.5 sm:col-span-2" : "space-y-1.5"}>
-								<Label htmlFor={`brand-${key}`}>{label}</Label>
-								<Input
-									id={`brand-${key}`}
-									value={location[key]}
-									onChange={(event) => onLocationChange({ ...location, [key]: event.target.value })}
-									placeholder={placeholder}
-									maxLength={200}
-									disabled={running}
-								/>
-							</div>
-						))}
-					</div>
-				</>
+				<MarketFields
+					location={location}
+					locationSourceUrl={locationSourceUrl}
+					running={running}
+					onLocationChange={onLocationChange}
+				/>
 			)}
 			{error && (
 				<div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-800">
@@ -168,30 +202,33 @@ function BrandResearchForm({
 				</div>
 			)}
 			<div className="flex flex-wrap items-center gap-2">
-				<Button type="submit" disabled={!website || running} className="flex items-center gap-2 cursor-pointer">
-					{running ? (
-						<>
-							<Spinner /> {step === "start" ? "Detecting location…" : "Analyzing brand…"}
-						</>
-					) : (
-						<>
-							<Play className="h-4 w-4" />
-							{step === "start"
-								? "Analyze Brand"
-								: hasLocation
-									? "Find Competitors and Prompts"
-									: "Continue Without a Location"}
-						</>
-					)}
-				</Button>
+				{researchUrl && (
+					<Button type="submit" disabled={running} className="flex items-center gap-2 cursor-pointer">
+						{running ? (
+							<>
+								<Spinner /> {progressLabel}
+							</>
+						) : (
+							<>
+								<Play className="h-4 w-4" />
+								{submitLabel}
+							</>
+						)}
+					</Button>
+				)}
 				{running && (
 					<Button type="button" variant="outline" onClick={onCancel} className="cursor-pointer">
 						Cancel
 					</Button>
 				)}
-				{step === "start" && !running && (
+				{initialStep && researchUrl && !running && (
 					<Button type="button" variant="ghost" onClick={onEnterManually}>
 						Enter Location Manually
+					</Button>
+				)}
+				{canSetUpManually && (
+					<Button type="button" variant={manualVariant} onClick={onSetUpManually}>
+						Set Up Manually
 					</Button>
 				)}
 			</div>
@@ -214,6 +251,7 @@ export default function PromptWizard({ onComplete }: PromptWizardProps) {
 	const [data, setData] = useState<WizardData>({
 		brandName: "",
 		website: "",
+		profileLinks: [],
 		additionalDomains: [],
 		aliases: [],
 		competitors: [],
@@ -221,18 +259,20 @@ export default function PromptWizard({ onComplete }: PromptWizardProps) {
 	});
 
 	const brandId = brand?.id;
+	const researchUrl = brand?.website ?? brand?.profileLinks?.find((link) => !profileLinkNeedsReview(link));
 	const hasLocation = Object.values(location).some((value) => value.trim());
 
 	const analysis = usePolledBrandJob({
 		queryKey: ["analyze-brand", brandId],
 		start: () => {
-			if (!brand?.id || !brand.website) throw new Error("Brand isn't loaded yet.");
+			if (!brand?.id || !researchUrl) throw new Error("A website or profile link is required for research.");
 			const stage = step === "start" ? "location" : "analysis";
 			const job = { brandId: brand.id, stage } as const;
 			research.current = startAnalyzeBrandFn({
 				data: {
 					...job,
-					website: brand.website,
+					website: researchUrl,
+					source: brand.website ? "website" : "profile",
 					brandName: brand.name,
 					location: stage === "analysis" ? location : undefined,
 				},
@@ -255,19 +295,23 @@ export default function PromptWizard({ onComplete }: PromptWizardProps) {
 				return;
 			}
 			const { suggestion } = result;
-			const website = brand?.website || suggestion.website || "";
+			const website = brand?.website ?? "";
 			setData({
 				brandName: suggestion.brandName || brand?.name || "",
 				website,
+				profileLinks: brand?.profileLinks ?? [],
 				additionalDomains: suggestion.additionalDomains.reduce<string[]>(
-					(kept, domain) => (validateAdditionalDomain(domain, [website, ...kept]) === true ? [...kept, domain] : kept),
-					[],
+					(kept, domain) =>
+						!isSharedDomainInput(domain) && validateAdditionalDomain(domain, [website, ...kept]) === true
+							? [...kept, domain]
+							: kept,
+					brand?.additionalDomains ?? [],
 				),
 				aliases: suggestion.aliases,
 				competitors: suggestion.competitors.map((c) =>
 					newCompetitorEntry({
 						name: c.name,
-						domains: c.domains,
+						domains: c.domains.filter((domain) => !isSharedDomainInput(domain)),
 						aliases: c.aliases,
 						localEvidence: c.localEvidence,
 						expanded: false,
@@ -292,13 +336,26 @@ export default function PromptWizard({ onComplete }: PromptWizardProps) {
 	});
 
 	const handleAnalyze = () => {
-		if (!brand?.website || !brand?.id) return;
+		if (!researchUrl || !brand?.id) return;
 		setError(null);
 		analysis.run();
 	};
 
 	const updateBrandName = useCallback((brandName: string) => setData((p) => ({ ...p, brandName })), []);
-	const updateWebsite = useCallback((website: string) => setData((p) => ({ ...p, website })), []);
+	const updateBusinessLinks = useCallback((links: BusinessLinkValues) => setData((p) => ({ ...p, ...links })), []);
+	const setUpManually = () => {
+		if (!brand) return;
+		setData({
+			brandName: brand.name,
+			website: brand.website ?? "",
+			profileLinks: brand.profileLinks ?? [],
+			additionalDomains: brand.additionalDomains ?? [],
+			aliases: brand.aliases ?? [],
+			competitors: [],
+			prompts: [],
+		});
+		setStep("review");
+	};
 	const updateAliases = useCallback((aliases: string[]) => setData((p) => ({ ...p, aliases })), []);
 	const updateAdditionalDomains = useCallback(
 		(additionalDomains: string[]) => setData((p) => ({ ...p, additionalDomains })),
@@ -312,14 +369,14 @@ export default function PromptWizard({ onComplete }: PromptWizardProps) {
 
 	const validateDomain = useCallback(
 		(val: string, current: string[]) =>
-			validateAdditionalDomain(val, [data.website.trim() || brand?.website, ...current]),
-		[data.website, brand?.website],
+			isSharedDomainInput(val)
+				? "Add this URL under Profile Links"
+				: validateAdditionalDomain(val, [data.website, ...current]),
+		[data.website],
 	);
 
-	const previewCounts = useMemo(() => {
-		const enabled = data.prompts.filter((p) => p.enabled && p.value.trim().length > 0).length;
-		return { totalNew: enabled };
-	}, [data.prompts]);
+	const promptCount = useMemo(() => data.prompts.filter((p) => p.enabled && p.value.trim()).length, [data.prompts]);
+	const promptCountLabel = promptCount === 1 ? "1 New Prompt" : `${promptCount} New Prompts`;
 
 	const handleSubmit = useCallback(async () => {
 		if (!brand?.id) return;
@@ -327,10 +384,11 @@ export default function PromptWizard({ onComplete }: PromptWizardProps) {
 		setIsSaving(true);
 		try {
 			const competitorsPayload = data.competitors
-				.filter((c) => c.name.trim() && c.domains.some((d) => d.trim()))
+				.filter((c) => c.name.trim())
 				.map((c) => ({
 					name: c.name.trim(),
 					domains: c.domains.filter((d) => d.trim()),
+					profileLinks: c.profileLinks,
 					aliases: c.aliases,
 				}));
 
@@ -342,7 +400,8 @@ export default function PromptWizard({ onComplete }: PromptWizardProps) {
 				data: {
 					brandId: brand.id,
 					brandName: data.brandName.trim() || brand.name,
-					website: data.website.trim() || brand.website,
+					website: data.website,
+					profileLinks: data.profileLinks,
 					additionalDomains: data.additionalDomains,
 					aliases: data.aliases,
 					competitors: competitorsPayload,
@@ -376,7 +435,7 @@ export default function PromptWizard({ onComplete }: PromptWizardProps) {
 		return (
 			<BrandResearchForm
 				step={step}
-				website={brand?.website ?? undefined}
+				researchUrl={researchUrl}
 				location={location}
 				locationSourceUrl={locationSourceUrl}
 				error={error}
@@ -385,6 +444,7 @@ export default function PromptWizard({ onComplete }: PromptWizardProps) {
 				onAnalyze={handleAnalyze}
 				onCancel={analysis.cancel}
 				onEnterManually={() => setStep("location")}
+				onSetUpManually={brand && setUpManually}
 			/>
 		);
 	}
@@ -401,17 +461,9 @@ export default function PromptWizard({ onComplete }: PromptWizardProps) {
 						<p className="text-xs text-muted-foreground">Brand name</p>
 						<Input value={data.brandName} onChange={(e) => updateBrandName(e.target.value)} placeholder="Brand name" />
 					</div>
-					<div>
-						<p className="text-xs text-muted-foreground">Website URL</p>
-						<Input
-							type="url"
-							value={data.website}
-							onChange={(e) => updateWebsite(e.target.value)}
-							placeholder="https://example.com"
-						/>
-					</div>
-					<div>
-						<p className="text-xs text-muted-foreground">Additional domains</p>
+					<BusinessLinkFields value={data} onChange={updateBusinessLinks} disabled={isSaving} />
+					<fieldset>
+						<legend className="text-xs text-muted-foreground">Additional Domains</legend>
 						<EditableTagsInput
 							items={data.additionalDomains}
 							onValueChange={updateAdditionalDomains}
@@ -421,7 +473,7 @@ export default function PromptWizard({ onComplete }: PromptWizardProps) {
 							pasteSplitter={DOMAIN_PASTE_SPLITTER}
 							onValidate={validateDomain}
 						/>
-					</div>
+					</fieldset>
 					<div>
 						<p className="text-xs text-muted-foreground">Aliases</p>
 						<EditableTagsInput
@@ -471,18 +523,15 @@ export default function PromptWizard({ onComplete }: PromptWizardProps) {
 				</div>
 			)}
 
-			<Button
-				onClick={handleSubmit}
-				disabled={isSaving || previewCounts.totalNew === 0}
-				className="flex items-center gap-2 cursor-pointer"
-			>
+			<Button onClick={handleSubmit} disabled={isSaving} className="flex items-center gap-2 cursor-pointer">
 				{isSaving ? (
 					<>
 						<Spinner /> Saving…
 					</>
 				) : (
 					<>
-						<Rocket className="h-4 w-4" /> Start tracking ({previewCounts.totalNew} new prompts)
+						<Rocket className="h-4 w-4" />
+						{promptCount ? `Start Tracking (${promptCountLabel})` : "Finish Setup"}
 					</>
 				)}
 			</Button>

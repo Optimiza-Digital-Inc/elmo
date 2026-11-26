@@ -18,8 +18,8 @@ body:json {
   {
     "id": "{{listsBrandId}}",
     "name": "Omitted Lists Brand",
-    "domains": ["{{listsBrandId}}.example.com"],
-    "competitors": [{ "name": "Bare Competitor", "domains": ["bare-competitor.example.com"] }],
+    "profileLinks": ["https://instagram.com/example-brand"],
+    "competitors": [{ "name": "Bare Competitor", "profileLinks": ["https://instagram.com/example-competitor"] }],
     "prompts": [{ "value": "Which tools does a bare prompt compare?" }]
   }
 }
@@ -27,4 +27,11 @@ body:json {
 assert {
   res.status: eq 201
   res.body.id: eq {{listsBrandId}}
+  res.body.domains: length 0
+}
+
+tests {
+  test("profile links keep the full URL", function() {
+    expect(res.getBody().profileLinks).to.deep.equal(["https://instagram.com/example-brand"]);
+  });
 }

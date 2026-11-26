@@ -23,5 +23,7 @@ tests {
   test("aliases default to an empty list", function() {
     const [competitor] = res.getBody().competitors;
     expect(competitor.aliases).to.deep.equal([]);
+    expect(competitor.domains).to.deep.equal([]);
+    expect(competitor.profileLinks).to.deep.equal(["https://instagram.com/example-competitor"]);
   });
 }

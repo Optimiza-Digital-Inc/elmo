@@ -9,6 +9,7 @@ import { Label } from "@workspace/ui/components/label";
 import { TagsInput } from "@workspace/ui/components/tags-input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip";
 import { useCallback, useState } from "react";
+import { BusinessLinkFields, type BusinessLinkValues, GoogleDomainReview } from "@/components/business-link-fields";
 import { SlugField } from "@/components/slug-field";
 import { WriteErrorMessage } from "@/components/write-error-message";
 import { useBrand } from "@/hooks/use-brands";
@@ -16,6 +17,7 @@ import { citationKeys } from "@/hooks/use-citations";
 import { dashboardKeys } from "@/hooks/use-dashboard-summary";
 import { useOrganization, useOrganizationsChanged } from "@/hooks/use-organizations";
 import { useBrandParams } from "@/hooks/use-route-params";
+import { isSharedDomainInput } from "@/lib/business-links";
 import { pageHead } from "@/lib/route-head";
 import { useWriteErrorMessage } from "@/lib/write-errors";
 import { updateBrandFn } from "@/server/brands";
@@ -38,6 +40,7 @@ function BrandSettingsPage() {
 	const [error, setError] = useState("");
 	const [success, setSuccess] = useState("");
 	const [additionalDomains, setAdditionalDomains] = useState<string[]>([]);
+	const [links, setLinks] = useState<BusinessLinkValues>({ website: "", profileLinks: [] });
 	const [aliases, setAliases] = useState<string[]>([]);
 	const [slug, setSlug] = useState("");
 
@@ -47,13 +50,17 @@ function BrandSettingsPage() {
 	if (brand && brand.updatedAt !== seededFrom) {
 		setSeededFrom(brand.updatedAt);
 		setAdditionalDomains(brand.additionalDomains || []);
+		setLinks({ website: brand.website ?? "", profileLinks: brand.profileLinks ?? [] });
 		setAliases(brand.aliases || []);
 		setSlug(brandSegment(brand));
 	}
 
 	const validateDomain = useCallback(
-		(val: string, current: string[]) => validateAdditionalDomain(val, [brand?.website, ...current]),
-		[brand?.website],
+		(val: string, current: string[]) =>
+			isSharedDomainInput(val)
+				? "Add this URL under Profile Links"
+				: validateAdditionalDomain(val, [links.website, ...current]),
+		[links.website],
 	);
 	const handleAliasesChange = useCallback((values: string[]) => setAliases(values), []);
 
@@ -88,7 +95,6 @@ function BrandSettingsPage() {
 
 		try {
 			const name = formData.get("name") as string;
-			const website = formData.get("website") as string;
 
 			const nextSlug = normalizeSlug(slug);
 			const slugMoved = nextSlug !== currentSlug;
@@ -96,7 +102,7 @@ function BrandSettingsPage() {
 				data: {
 					brandId: brand.id,
 					name,
-					website,
+					...links,
 					...(slugMoved && { slug: nextSlug }),
 					additionalDomains,
 					aliases,
@@ -158,19 +164,7 @@ function BrandSettingsPage() {
 						disabled={isSubmitting}
 					/>
 
-					<div className="space-y-2">
-						<Label htmlFor="website">Website</Label>
-						<Input
-							id="website"
-							name="website"
-							type="text"
-							placeholder="example.com"
-							defaultValue={brand.website}
-							required
-							disabled={isSubmitting}
-						/>
-						<p className="text-xs text-muted-foreground">Your brand&apos;s primary website</p>
-					</div>
+					<BusinessLinkFields value={links} onChange={setLinks} disabled={isSubmitting} />
 
 					<div className="space-y-2">
 						<Label className="flex items-center gap-1.5">
@@ -190,9 +184,12 @@ function BrandSettingsPage() {
 							pasteSplitter={/[\n,\t]+/}
 							searchPlaceholder="Add domain..."
 							maxItems={10}
-							normalizeValue={(raw) => cleanAndValidateDomain(raw) ?? raw.trim()}
+							normalizeValue={(raw) =>
+								isSharedDomainInput(raw) ? raw.trim() : (cleanAndValidateDomain(raw) ?? raw.trim())
+							}
 							onValidate={validateDomain}
 						/>
+						<GoogleDomainReview domains={[brand.website ?? "", ...brand.additionalDomains]} />
 					</div>
 
 					<div className="space-y-2">

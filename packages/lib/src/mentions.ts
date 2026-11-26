@@ -23,7 +23,7 @@ export function mentionConfigFrom(brand: Brand, competitors: Competitor[]): Ment
 		brand: {
 			name: brand.name,
 			aliases: brand.aliases ?? [],
-			domains: [brand.website, ...(brand.additionalDomains ?? [])],
+			domains: [brand.website, ...(brand.additionalDomains ?? [])].filter((domain) => domain !== null),
 		},
 		competitors: competitors.map((competitor) => ({
 			name: competitor.name,

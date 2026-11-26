@@ -19,12 +19,15 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/component
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useCallback } from "react";
 import { v4 as uuidv4 } from "uuid";
+import { GoogleDomainReview, ProfileLinksField } from "@/components/business-link-fields";
 import { SiteIcon } from "@/components/site-icon";
+import { isSharedDomainInput } from "@/lib/business-links";
 
 export interface CompetitorEntry {
 	_key: string;
 	name: string;
 	domains: string[];
+	profileLinks: string[];
 	aliases: string[];
 	localEvidence?: OnboardingCompetitor["localEvidence"];
 	expanded: boolean;
@@ -41,6 +44,7 @@ export function newCompetitorEntry(partial?: Partial<CompetitorEntry>): Competit
 		_key: uuidv4(),
 		name: partial?.name ?? "",
 		domains: partial?.domains ?? [],
+		profileLinks: partial?.profileLinks ?? [],
 		aliases: partial?.aliases ?? [],
 		localEvidence: partial?.localEvidence,
 		expanded: partial?.expanded ?? true,
@@ -49,6 +53,7 @@ export function newCompetitorEntry(partial?: Partial<CompetitorEntry>): Competit
 
 export function CompetitorsEditor({ competitors, onChange, disabled }: CompetitorsEditorProps) {
 	const validateDomain = useCallback((val: string): true | string => {
+		if (isSharedDomainInput(val)) return "Add this URL under Profile Links";
 		const cleaned = cleanAndValidateDomain(val);
 		if (!cleaned) return `"${val}" is not a valid domain`;
 		return true;
@@ -63,7 +68,7 @@ export function CompetitorsEditor({ competitors, onChange, disabled }: Competito
 		onChange([...competitors, newCompetitorEntry()]);
 	};
 
-	const validCount = competitors.filter((c) => c.name.trim() && c.domains.some((d) => d.trim())).length;
+	const validCount = competitors.filter((c) => c.name.trim()).length;
 
 	return (
 		<div className="space-y-4">
@@ -144,7 +149,7 @@ export function CompetitorsEditor({ competitors, onChange, disabled }: Competito
 
 							<div className="space-y-1.5">
 								<Label className="text-xs font-medium flex items-center gap-1.5">
-									Domains
+									Domains (Optional)
 									<Tooltip>
 										<TooltipTrigger
 											render={<IconInfoCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />}
@@ -160,11 +165,21 @@ export function CompetitorsEditor({ competitors, onChange, disabled }: Competito
 									onValueChange={(values) => update(competitor._key, { domains: values, localEvidence: undefined })}
 									placeholder="Add domain..."
 									maxItems={10}
-									normalizeValue={(raw) => cleanAndValidateDomain(raw) ?? raw.trim()}
+									normalizeValue={(raw) =>
+										isSharedDomainInput(raw) ? raw.trim() : (cleanAndValidateDomain(raw) ?? raw.trim())
+									}
+									disabled={disabled}
 									pasteSplitter={/[\n,\t]+/}
 									onValidate={validateDomain}
 								/>
+								<GoogleDomainReview domains={competitor.domains} />
 							</div>
+
+							<ProfileLinksField
+								links={competitor.profileLinks}
+								onChange={(profileLinks) => update(competitor._key, { profileLinks })}
+								disabled={disabled}
+							/>
 
 							<div className="space-y-1.5">
 								<Label className="text-xs font-medium flex items-center gap-1.5">

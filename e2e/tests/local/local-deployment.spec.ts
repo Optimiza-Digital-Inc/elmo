@@ -100,6 +100,31 @@ test.describe("Local features", () => {
     await expect(page.getByLabel("Website")).toBeVisible();
   });
 
+  test("manual setup saves a brand and competitors without websites", async ({ page }) => {
+    const brandName = `Example Bakery ${Date.now()}`;
+    const competitorName = "Example Cake Shop";
+    await page.goto(`${organizationUrl()}/new`);
+    await page.getByLabel("Brand Name").fill(brandName);
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+
+    await page.getByRole("button", { name: "Set Up Manually" }).click({ timeout: 30_000 });
+    const overview = new URL(page.url()).pathname.replace(/\/$/, "");
+    await page.getByRole("button", { name: "Add Competitor" }).click();
+    await page.getByPlaceholder("Competitor name").fill(competitorName);
+    await page.getByRole("button", { name: "Finish Setup" }).click();
+    await expect(page.getByRole("button", { name: "Finish Setup" })).toHaveCount(0);
+
+    await page.goto(`${overview}/settings/competitors`);
+    await expect(page.getByText(competitorName, { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Add Competitor" }).click();
+    await page.getByPlaceholder("Competitor name").fill("Example Bread Shop");
+    await page.getByRole("button", { name: /save changes/i }).click();
+    await expect(page.getByRole("button", { name: /save changes/i })).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByText(competitorName, { exact: true })).toBeVisible();
+    await expect(page.getByText("Example Bread Shop", { exact: true })).toBeVisible();
+  });
+
   test("organizations cannot be created — a local install has exactly one", async ({ page }) => {
     await page.goto("/app");
     await expect(page.getByRole("link", { name: /new organization/i })).toHaveCount(0);

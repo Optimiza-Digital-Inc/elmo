@@ -200,6 +200,7 @@ function ChartSection({
 			name: c.name,
 			brandId: brandId || "",
 			domains: [],
+			profileLinks: [],
 			aliases: [],
 			createdAt: new Date(),
 			updatedAt: new Date(),

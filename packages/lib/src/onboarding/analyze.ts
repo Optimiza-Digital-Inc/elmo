@@ -116,6 +116,7 @@ export interface OnboardingSuggestion {
 export interface AnalyzeBrandOptions {
 	/** A URL with a path is researched as given, for sub-brands; mentions always match the hostname. */
 	website: string;
+	source?: "website" | "profile";
 	brandName?: string;
 	location?: BrandLocation;
 	/** 0 disables competitor generation entirely. */
@@ -145,6 +146,7 @@ export interface AnalysisContext {
 export async function buildAnalysisContext(options: AnalyzeBrandOptions): Promise<AnalysisContext> {
 	const {
 		website,
+		source = "website",
 		brandName,
 		location,
 		maxCompetitors = DEFAULT_MAX_COMPETITORS,
@@ -159,7 +161,7 @@ export async function buildAnalysisContext(options: AnalyzeBrandOptions): Promis
 
 	const providedBrandName = brandName?.trim() || undefined;
 	const brandNameHint = providedBrandName ?? inferBrandNameFromDomain(normalizedWebsite);
-	const websiteExcerpt = await safeGetExcerpt(analysisUrl);
+	const websiteExcerpt = source === "website" ? await safeGetExcerpt(analysisUrl) : "";
 	const targetMarket = location
 		? uniqueTrim([location.serviceArea.trim() || location.city, location.country]).join(", ")
 		: "";
@@ -168,6 +170,7 @@ export async function buildAnalysisContext(options: AnalyzeBrandOptions): Promis
 	const prompt = buildPrompt({
 		analysisUrl,
 		trackedDomain: normalizedWebsite,
+		source,
 		brandNameHint,
 		brandNameWasProvided: providedBrandName !== undefined,
 		websiteExcerpt,
@@ -177,7 +180,7 @@ export async function buildAnalysisContext(options: AnalyzeBrandOptions): Promis
 	});
 
 	return {
-		website: normalizedWebsite,
+		website: source === "website" ? normalizedWebsite : "",
 		analysisUrl,
 		brandNameHint,
 		...(providedBrandName !== undefined && { providedBrandName }),
@@ -193,6 +196,7 @@ export function normalizeAnalysisResult(raw: RawSuggestion, ctx: AnalysisContext
 	return normalize({
 		raw,
 		website: ctx.website,
+		sourceDomain: cleanDomain(ctx.analysisUrl),
 		brandNameHint: ctx.brandNameHint,
 		...(ctx.providedBrandName !== undefined && { providedBrandName: ctx.providedBrandName }),
 		includeCompetitors: ctx.maxCompetitors > 0,
@@ -253,6 +257,7 @@ function isSubPage(analysisUrl: string): boolean {
 function buildPrompt(args: {
 	analysisUrl: string;
 	trackedDomain: string;
+	source: "website" | "profile";
 	brandNameHint: string;
 	brandNameWasProvided: boolean;
 	websiteExcerpt: string;
@@ -267,9 +272,12 @@ function buildPrompt(args: {
 		: `Likely brand name (from domain): ${args.brandNameHint}`;
 
 	// A page below the root is usually a sub-brand; describe it, not the domain's owner.
-	const scopeNote = isSubPage(args.analysisUrl)
-		? `\nThis is one page on ${args.trackedDomain}, not the site root. If it covers a sub-brand, product line, or regional arm, scope the brand name, competitors, and prompts to THAT rather than to the parent company.\n`
-		: "";
+	const scopeNote =
+		args.source === "profile"
+			? "\nUse this public profile to identify the business and its market. Only include domains owned by the business.\n"
+			: isSubPage(args.analysisUrl)
+				? `\nThis is one page on ${args.trackedDomain}, not the site root. If it covers a sub-brand, product line, or regional arm, scope the brand name, competitors, and prompts to THAT rather than to the parent company.\n`
+				: "";
 
 	const skipNotes: string[] = [];
 	if (!args.includeCompetitors) skipNotes.push("Return an empty array for competitors.");
@@ -292,6 +300,7 @@ You MUST return the structured JSON object — even if you can find nothing abou
 function normalize(args: {
 	raw: RawSuggestion;
 	website: string;
+	sourceDomain: string;
 	brandNameHint: string;
 	providedBrandName?: string;
 	includeCompetitors: boolean;
@@ -303,6 +312,7 @@ function normalize(args: {
 	const {
 		raw,
 		website,
+		sourceDomain,
 		brandNameHint,
 		providedBrandName,
 		includeCompetitors,
@@ -316,10 +326,10 @@ function normalize(args: {
 	// "Nike"), which would silently widen every match.
 	const brandName = providedBrandName ?? ((raw.brandName || brandNameHint).trim() || brandNameHint);
 
-	const ownedDomains = new Set([website]);
+	const ownedDomains = new Set([sourceDomain]);
 	const additionalDomains = (raw.additionalDomains ?? [])
 		.map((d) => cleanAndValidateDomain(d))
-		.filter((d): d is string => d !== null && d !== website);
+		.filter((d): d is string => d !== null && d !== sourceDomain);
 	for (const d of additionalDomains) ownedDomains.add(d);
 
 	const dedupedAdditionalDomains = uniqueLowercase(additionalDomains);

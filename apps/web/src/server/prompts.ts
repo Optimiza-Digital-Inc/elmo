@@ -337,7 +337,7 @@ export const getPromptStatsFn = createServerFn({ method: "GET" })
 				.where(eq(competitors.brandId, prompt[0].brandId)),
 		]);
 
-		const primaryBrandDomain = brandInfo[0] ? extractDomain(brandInfo[0].website) : "";
+		const primaryBrandDomain = extractDomain(brandInfo[0]?.website ?? "");
 		const additionalBrandDomains = (brandInfo[0]?.additionalDomains || []).map(extractDomain);
 		const brandDomains = new Set([primaryBrandDomain, ...additionalBrandDomains].filter(Boolean));
 		const competitorDomains = new Set(competitorsList.flatMap((c) => c.domains.map(extractDomain)).filter(Boolean));

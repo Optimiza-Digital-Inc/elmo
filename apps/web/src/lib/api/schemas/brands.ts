@@ -5,6 +5,7 @@ export const brandSchema = z.object({
 	id: z.string(),
 	name: z.string(),
 	domains: z.array(z.string()),
+	profileLinks: z.array(z.string()),
 	aliases: z.array(z.string()),
 	enabled: z.boolean(),
 	onboarded: z.boolean(),

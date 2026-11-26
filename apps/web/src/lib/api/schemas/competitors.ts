@@ -6,6 +6,7 @@ export const competitorSchema = z.object({
 	brandId: z.string(),
 	name: z.string(),
 	domains: z.array(z.string()),
+	profileLinks: z.array(z.string()),
 	aliases: z.array(z.string()),
 	createdAt: z.iso.datetime({ offset: true }),
 	updatedAt: z.iso.datetime({ offset: true }),

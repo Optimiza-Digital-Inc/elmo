@@ -4,7 +4,7 @@ interface OrganizationBrand {
 	id: string;
 	slug: string | null;
 	name: string;
-	website: string;
+	website: string | null;
 	onboarded: boolean;
 }
 

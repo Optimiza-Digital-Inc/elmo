@@ -70,7 +70,7 @@ export type UpdatePromptInput = z.infer<typeof updatePromptInputSchema>;
 export interface PromptBrand {
 	id: string;
 	name: string;
-	website: string;
+	website: string | null;
 	organizationId: string;
 }
 

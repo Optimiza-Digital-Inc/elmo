@@ -1,14 +1,13 @@
 import { useNavigate } from "@tanstack/react-router";
 import { brandSegment } from "@workspace/lib/app-urls";
 import { Button } from "@workspace/ui/components/button";
-import { Input } from "@workspace/ui/components/input";
-import { Label } from "@workspace/ui/components/label";
 import { useState } from "react";
+import { BusinessLinkFields, type BusinessLinkValues } from "@/components/business-link-fields";
 import FullPageCard from "@/components/full-page-card";
 import { PlatformSelectionStep } from "@/components/platform-selection-step";
 import { WriteErrorMessage } from "@/components/write-error-message";
 import { useOrganizationsChanged } from "@/hooks/use-organizations";
-import { validateWebsiteUrl } from "@/lib/brand-website";
+import { normalizeBusinessWebsite } from "@/lib/business-links";
 import { trackEvent } from "@/lib/posthog";
 import { useWriteErrorMessage } from "@/lib/write-errors";
 import { createBrandFn } from "@/server/brands";
@@ -23,7 +22,7 @@ interface BrandOnboardingProps {
 
 export default function BrandOnboarding({ organizationSlug, brandId, brandName, platformState }: BrandOnboardingProps) {
 	const [step, setStep] = useState<"website" | "platforms">("website");
-	const [website, setWebsite] = useState("");
+	const [links, setLinks] = useState<BusinessLinkValues>({ website: "", profileLinks: [] });
 	const [selected, setSelected] = useState<Set<string>>(
 		platformState ? new Set(platformState.defaultSelected) : new Set(),
 	);
@@ -42,11 +41,11 @@ export default function BrandOnboarding({ organizationSlug, brandId, brandName, 
 				data: {
 					brandId,
 					brandName,
-					website,
+					...links,
 					...(enabledModels && enabledModels.length > 0 && { enabledModels }),
 				},
 			});
-			trackEvent("brand_created", { has_website: Boolean(website) });
+			trackEvent("brand_created", { has_website: Boolean(links.website) });
 
 			await organizationsChanged(() =>
 				navigate({
@@ -64,8 +63,8 @@ export default function BrandOnboarding({ organizationSlug, brandId, brandName, 
 	const handleWebsiteSubmit = async () => {
 		setError("");
 
-		const validation = validateWebsiteUrl(website);
-		if (!validation.isValid) {
+		const validation = normalizeBusinessWebsite(links.website);
+		if (!validation.ok) {
 			setError(validation.error);
 			return;
 		}
@@ -97,20 +96,7 @@ export default function BrandOnboarding({ organizationSlug, brandId, brandName, 
 	return (
 		<FullPageCard title={`Setup ${brandName}`} subtitle="Configure your brand to get started" showBackButton={true}>
 			<form action={handleWebsiteSubmit} className="space-y-4">
-				<div className="space-y-2">
-					<Label htmlFor="website">Website</Label>
-					<Input
-						id="website"
-						name="website"
-						type="text"
-						placeholder="example.com"
-						required
-						disabled={isLoading}
-						value={website}
-						onChange={(e) => setWebsite(e.target.value)}
-					/>
-					<p className="text-xs text-muted-foreground">Enter your brand's website</p>
-				</div>
+				<BusinessLinkFields value={links} onChange={setLinks} disabled={isLoading} />
 
 				{error && (
 					<p className="text-sm text-destructive">

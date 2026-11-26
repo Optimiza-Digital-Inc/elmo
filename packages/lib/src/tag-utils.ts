@@ -57,12 +57,13 @@ export function getEffectiveBrandedStatus(systemTags: string[], userTags: string
 export function isPromptBranded(
 	promptValue: string,
 	brandName: string,
-	brandWebsite: string,
+	brandWebsite: string | null,
 	aliases: readonly string[] = [],
 ): boolean {
 	const promptLower = promptValue.toLowerCase();
 	const names = [brandName, ...aliases].map((name) => name.trim().toLowerCase()).filter(Boolean);
 	if (names.some((name) => promptLower.includes(name))) return true;
+	if (!brandWebsite) return false;
 
 	try {
 		const url = new URL(brandWebsite.startsWith("http") ? brandWebsite : `https://${brandWebsite}`);
@@ -79,7 +80,7 @@ export function isPromptBranded(
 export function computeSystemTags(
 	promptValue: string,
 	brandName: string,
-	brandWebsite: string,
+	brandWebsite: string | null,
 	aliases: readonly string[] = [],
 ): string[] {
 	const isBranded = isPromptBranded(promptValue, brandName, brandWebsite, aliases);

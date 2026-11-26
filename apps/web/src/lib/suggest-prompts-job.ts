@@ -6,6 +6,7 @@ import type { OnboardingPrompt } from "@workspace/lib/onboarding";
 import { eq } from "drizzle-orm";
 import { getBoss } from "@/lib/boss-client";
 import { type BrandJob, brandJobs, cancelBrandJob, IN_FLIGHT_STATES, readBrandJob } from "@/lib/brand-jobs";
+import { profileLinkNeedsReview } from "@/lib/business-links";
 
 const SUGGEST_PROMPTS_QUEUE = "suggest-prompts";
 const SUGGESTIONS_PER_RUN = 5;
@@ -69,6 +70,7 @@ export async function enqueuePromptSuggestions(input: PromptSuggestionsInput): P
 	await boss.send(SUGGEST_PROMPTS_QUEUE, {
 		brandId: input.brandId,
 		website: brand.website,
+		profileUrl: brand.profileLinks.find((link) => !profileLinkNeedsReview(link)),
 		brandName: brand.name,
 		existingPrompts: [...existing.values()],
 		existingTags: [...new Set(brandPrompts.flatMap((p) => p.tags ?? []))].sort(),

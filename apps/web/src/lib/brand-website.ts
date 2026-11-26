@@ -17,7 +17,10 @@ export function validateWebsiteUrl(input: string): WebsiteValidationResult {
 		return { isValid: false, error: "Website URL is required" };
 	}
 	let candidate = input.trim();
-	if (!candidate.startsWith("http://") && !candidate.startsWith("https://")) {
+	if (/^[a-z][a-z\d+.-]*:\/\//i.test(candidate) && !/^https?:\/\//i.test(candidate)) {
+		return { isValid: false, error: "Website URL must use HTTP or HTTPS" };
+	}
+	if (!/^https?:\/\//i.test(candidate)) {
 		candidate = `https://${candidate}`;
 	}
 	let urlObj: URL;

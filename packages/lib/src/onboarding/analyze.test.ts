@@ -55,6 +55,26 @@ describe("detectBrandLocation", () => {
 	});
 });
 
+describe("profile research", () => {
+	it("uses the listing to research the business without assigning the listing hostname to it", async () => {
+		const website = "https://instagram.com/examplecafe";
+		vi.mocked(runStructuredResearchPrompt).mockResolvedValueOnce({
+			brandName: "Example Café",
+			additionalDomains: ["instagram.com", "examplecafe.example"],
+			aliases: [],
+			competitors: [],
+			suggestedPrompts: [],
+		});
+
+		const result = await analyzeBrand({ website, source: "profile", brandName: "Example Café" });
+
+		expect(vi.mocked(runStructuredResearchPrompt).mock.calls[0]?.[0]).toContain(website);
+		expect(getWebsiteExcerpt).not.toHaveBeenCalled();
+		expect(result.website).toBe("");
+		expect(result.additionalDomains).toEqual(["examplecafe.example"]);
+	});
+});
+
 describe("analyzeBrand", () => {
 	it("uses the confirmed coverage for research and omits competitors without a usable source", async () => {
 		vi.mocked(runStructuredResearchPrompt).mockResolvedValueOnce({

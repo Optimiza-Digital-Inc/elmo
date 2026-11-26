@@ -16,6 +16,7 @@ import { z } from "zod";
 import { ApiError, createApiHandler, withMethodGuard } from "@/lib/api/handler";
 import { competitorSchema } from "@/lib/api/schemas/competitors";
 import { isBrandInScope } from "@/lib/api/scope";
+import { normalizeProfileLinks, ownedDomainInputsSchema, profileLinksSchema } from "@/lib/business-links";
 import { toCompetitorSummary } from "@/server/competitors-core";
 
 const competitorParams = z.object({ competitorId: z.uuid("Invalid competitor ID format") });
@@ -23,10 +24,14 @@ const competitorParams = z.object({ competitorId: z.uuid("Invalid competitor ID 
 const updateCompetitorBody = z
 	.object({
 		name: z.string().trim().min(1, "name must be a non-empty string").optional(),
-		domains: z.array(z.string()).optional(),
+		domains: ownedDomainInputsSchema.optional(),
+		profileLinks: profileLinksSchema.optional(),
 		aliases: z.array(z.string()).optional(),
 	})
-	.refine((body) => Object.keys(body).length > 0, "At least one of name, domains, or aliases must be provided");
+	.refine(
+		(body) => Object.keys(body).length > 0,
+		"At least one of name, domains, profileLinks, or aliases must be provided",
+	);
 
 /**
  * Load a competitor the caller may reach. A competitor belonging to another
@@ -67,6 +72,9 @@ export const Route = createFileRoute("/api/v1/competitors/$competitorId")({
 					}
 					if (body.domains !== undefined) {
 						update.domains = dedupeDomains(body.domains);
+					}
+					if (body.profileLinks !== undefined) {
+						update.profileLinks = normalizeProfileLinks(body.profileLinks);
 					}
 					if (body.aliases !== undefined) {
 						update.aliases = dedupeAliases(body.aliases);

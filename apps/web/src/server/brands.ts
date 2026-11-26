@@ -6,7 +6,6 @@ import { parseScrapeTargets } from "@workspace/config/scrape-targets";
 import { getDeployment } from "@workspace/deployment";
 import { isValidSlug, MAX_SLUG_LENGTH, slugify } from "@workspace/lib/app-urls";
 import { type BrandTrackingState, brandTrackingState } from "@workspace/lib/brand-state";
-import { cleanAndValidateDomain } from "@workspace/lib/citations/domain-categories";
 import { getDefaultDelayHours } from "@workspace/lib/constants";
 import { db } from "@workspace/lib/db/db";
 import { type Brand, brands, competitors, prompts } from "@workspace/lib/db/schema";
@@ -38,7 +37,7 @@ import {
 	requirePlatformPicksEditable,
 } from "@/lib/auth/helpers";
 import { normalizeBrandUpdate } from "@/lib/brand-settings";
-import { validateWebsiteUrl } from "@/lib/brand-website";
+import { cleanOwnedDomain, normalizeProfileLinks, profileLinksSchema } from "@/lib/business-links";
 import type { TrackedTarget } from "@/lib/model-filter";
 import { INVALID_SLUG, TAKEN_SLUG } from "@/lib/slug-errors";
 
@@ -117,7 +116,7 @@ function getDefaultBrandDomains(): string[] {
 		.split(",")
 		.map((d) => d.trim())
 		.filter(Boolean)
-		.map((d) => cleanAndValidateDomain(d))
+		.map((d) => cleanOwnedDomain(d))
 		.filter((d): d is string => d !== null);
 }
 
@@ -173,8 +172,9 @@ export const createBrandFn = createServerFn({ method: "POST" })
 	.validator(
 		z.object({
 			brandId: z.string(),
-			brandName: z.string(),
-			website: z.string(),
+			brandName: z.string().trim().min(1),
+			website: z.string().nullish(),
+			profileLinks: profileLinksSchema.optional(),
 			/** Platform picks from the onboarding wizard; omitted → plan defaults. */
 			enabledModels: z.array(z.string().min(1)).max(50).optional(),
 		}),
@@ -186,10 +186,8 @@ export const createBrandFn = createServerFn({ method: "POST" })
 		// org id), so the brand count gate applies to that org.
 		await assertCanCreateBrand(data.brandId);
 
-		const urlValidation = validateWebsiteUrl(data.website);
-		if (!urlValidation.isValid) {
-			throw new Error(urlValidation.error);
-		}
+		const links = normalizeBrandUpdate({ website: data.website ?? null, profileLinks: data.profileLinks ?? [] });
+		if (!links.ok) throw new Error(links.error);
 
 		const defaultDomains = getDefaultBrandDomains();
 		const enabledModels = await resolveCreateEnabledModels(data.brandId, data.enabledModels);
@@ -204,7 +202,7 @@ export const createBrandFn = createServerFn({ method: "POST" })
 							organizationId: data.brandId,
 							name: data.brandName,
 							slug,
-							website: urlValidation.formattedUrl,
+							...links.updates,
 							enabled: true,
 							...(enabledModels && { enabledModels }),
 							...(defaultDomains.length > 0 && { additionalDomains: defaultDomains }),
@@ -236,7 +234,8 @@ export const createBrandInOrgFn = createServerFn({ method: "POST" })
 	.validator(
 		z.object({
 			brandName: z.string().min(1).max(100),
-			website: z.string().min(1),
+			website: z.string().nullish(),
+			profileLinks: profileLinksSchema.optional(),
 			organizationId: z.string(),
 			/** Platform picks from the creation wizard; omitted → plan defaults. */
 			enabledModels: z.array(z.string().min(1)).max(50).optional(),
@@ -250,10 +249,8 @@ export const createBrandInOrgFn = createServerFn({ method: "POST" })
 			throw new Error("Brand creation is not allowed in this deployment");
 		}
 
-		const urlValidation = validateWebsiteUrl(data.website);
-		if (!urlValidation.isValid) {
-			throw new Error(urlValidation.error);
-		}
+		const links = normalizeBrandUpdate({ website: data.website ?? null, profileLinks: data.profileLinks ?? [] });
+		if (!links.ok) throw new Error(links.error);
 
 		const trimmedName = data.brandName.trim();
 		if (!trimmedName) {
@@ -278,7 +275,7 @@ export const createBrandInOrgFn = createServerFn({ method: "POST" })
 					organizationId: orgId,
 					name: trimmedName,
 					slug,
-					website: urlValidation.formattedUrl,
+					...links.updates,
 					enabled: true,
 					...(enabledModels && { enabledModels }),
 					...(defaultDomains.length > 0 && { additionalDomains: defaultDomains }),
@@ -294,7 +291,8 @@ export const updateBrandFn = createServerFn({ method: "POST" })
 		z.object({
 			brandId: z.string(),
 			name: z.string().optional(),
-			website: z.string().optional(),
+			website: z.string().nullish(),
+			profileLinks: profileLinksSchema.optional(),
 			slug: z.string().trim().toLowerCase().max(MAX_SLUG_LENGTH).optional(),
 			additionalDomains: z.array(z.string()).optional(),
 			aliases: z.array(z.string()).optional(),
@@ -309,14 +307,13 @@ export const updateBrandFn = createServerFn({ method: "POST" })
 		const normalized = normalizeBrandUpdate({
 			name: data.name,
 			website: data.website,
+			profileLinks: data.profileLinks,
 			additionalDomains: data.additionalDomains,
 			aliases: data.aliases,
 		});
 		if (!normalized.ok) {
 			throw new Error(normalized.error);
 		}
-		const updateData = normalized.updates;
-
 		const result = await claimBrandSlug(
 			() =>
 				db.transaction(async (tx) => {
@@ -326,9 +323,18 @@ export const updateBrandFn = createServerFn({ method: "POST" })
 					) {
 						throw new Error(TAKEN_SLUG);
 					}
+					const updates = normalized.updates;
+					if (normalized.movedProfileLink) {
+						const [brand] = await tx
+							.select({ profileLinks: brands.profileLinks })
+							.from(brands)
+							.where(eq(brands.id, data.brandId))
+							.for("update");
+						updates.profileLinks = normalizeProfileLinks([...(brand?.profileLinks ?? []), normalized.movedProfileLink]);
+					}
 					return tx
 						.update(brands)
-						.set({ ...updateData, ...(data.slug !== undefined && { slug: data.slug }), updatedAt: new Date() })
+						.set({ ...updates, ...(data.slug !== undefined && { slug: data.slug }), updatedAt: new Date() })
 						.where(eq(brands.id, data.brandId))
 						.returning();
 				}),
@@ -358,8 +364,9 @@ export const updateCompetitors = createServerFn({ method: "POST" })
 			brandId: z.string(),
 			competitors: z.array(
 				z.object({
-					name: z.string(),
-					domains: z.array(z.string()).min(1),
+					name: z.string().trim().min(1),
+					domains: z.array(z.string()).default([]),
+					profileLinks: profileLinksSchema.default([]),
 					aliases: z.array(z.string()).optional().default([]),
 				}),
 			),
@@ -372,7 +379,7 @@ export const updateCompetitors = createServerFn({ method: "POST" })
 		assertAllowed(decideCompetitorCap(data.competitors.length));
 
 		const cleanedCompetitors = data.competitors.map((c) => {
-			const cleanedDomains = c.domains.map((d) => cleanAndValidateDomain(d));
+			const cleanedDomains = c.domains.map(cleanOwnedDomain);
 			const invalid = c.domains.filter((_, i) => !cleanedDomains[i]);
 			if (invalid.length > 0) {
 				throw new Error(`Invalid domain(s) for "${c.name}": ${invalid.join(", ")}`);
@@ -380,6 +387,7 @@ export const updateCompetitors = createServerFn({ method: "POST" })
 			return {
 				name: c.name,
 				domains: cleanedDomains.filter(Boolean) as string[],
+				profileLinks: normalizeProfileLinks(c.profileLinks),
 				aliases: c.aliases,
 			};
 		});
@@ -390,10 +398,8 @@ export const updateCompetitors = createServerFn({ method: "POST" })
 			if (cleanedCompetitors.length > 0) {
 				await tx.insert(competitors).values(
 					cleanedCompetitors.map((c) => ({
+						...c,
 						brandId: data.brandId,
-						name: c.name,
-						domains: c.domains,
-						aliases: c.aliases,
 					})),
 				);
 			}
@@ -414,7 +420,7 @@ export const addDomainToBrandFn = createServerFn({ method: "POST" })
 	.handler(async ({ data }) => {
 		await requireBrandSession(data.brandId);
 
-		const domain = cleanAndValidateDomain(data.domain);
+		const domain = cleanOwnedDomain(data.domain);
 		if (!domain) throw new Error(`Invalid domain: ${data.domain}`);
 
 		const [result] = await db
@@ -451,7 +457,7 @@ export const addDomainToCompetitorFn = createServerFn({ method: "POST" })
 		});
 		if (!existing) throw new Error("Competitor not found");
 
-		const domain = cleanAndValidateDomain(data.domain);
+		const domain = cleanOwnedDomain(data.domain);
 		if (!domain) throw new Error(`Invalid domain: ${data.domain}`);
 		if (existing.domains.includes(domain)) return existing;
 
@@ -477,7 +483,7 @@ export const createCompetitorFromDomainFn = createServerFn({ method: "POST" })
 		const session = await requireAuthSession();
 		const org = await requireBrandOrganization(session.user.id, data.brandId);
 
-		const domain = cleanAndValidateDomain(data.domain);
+		const domain = cleanOwnedDomain(data.domain);
 		if (!domain) throw new Error(`Invalid domain: ${data.domain}`);
 
 		// Check and insert under one lock: otherwise two requests on a brand's

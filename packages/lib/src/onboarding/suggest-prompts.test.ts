@@ -11,6 +11,15 @@ afterEach(() => {
 });
 
 describe("suggestPrompts", () => {
+	it("suggests prompts for a brand configured without a website", async () => {
+		vi.mocked(runStructuredResearchPrompt).mockResolvedValueOnce({
+			suggestedPrompts: [{ prompt: "Where can I buy handmade bread?", tags: ["bread"] }],
+		});
+		await expect(
+			suggestPrompts({ website: null, brandName: "Example Bakery", existingPrompts: ["Local sourdough shops"] }),
+		).resolves.toEqual([{ prompt: "where can i buy handmade bread?", tags: ["bread"] }]);
+	});
+
 	it("never returns a prompt the brand already has, however the model spells it", async () => {
 		vi.mocked(runStructuredResearchPrompt).mockResolvedValueOnce({
 			suggestedPrompts: [

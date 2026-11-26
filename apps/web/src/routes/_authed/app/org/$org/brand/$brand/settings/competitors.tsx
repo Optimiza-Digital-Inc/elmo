@@ -22,10 +22,11 @@ export const Route = createFileRoute("/_authed/app/org/$org/brand/$brand/setting
 
 function saveable(competitors: CompetitorEntry[]) {
 	return competitors
-		.filter((c) => c.name.trim() && c.domains.some((d) => d.trim()))
+		.filter((c) => c.name.trim())
 		.map((c) => ({
 			name: c.name.trim(),
 			domains: c.domains.map((d) => d.trim()).filter(Boolean),
+			profileLinks: c.profileLinks,
 			aliases: c.aliases.map((a) => a.trim()).filter(Boolean),
 		}));
 }
@@ -53,6 +54,7 @@ function CompetitorsSettingsPage() {
 				_key: uuidv4(),
 				name: c.name,
 				domains: c.domains ?? [],
+				profileLinks: c.profileLinks ?? [],
 				aliases: c.aliases || [],
 				expanded: false,
 			})),
@@ -64,6 +66,7 @@ function CompetitorsSettingsPage() {
 			existingCompetitors.map((c) => ({
 				name: c.name,
 				domains: c.domains ?? [],
+				profileLinks: c.profileLinks ?? [],
 				aliases: c.aliases || [],
 			})),
 		[existingCompetitors],

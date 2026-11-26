@@ -35,6 +35,32 @@ describe("normalizeBrandUpdate", () => {
 	});
 
 	describe("website", () => {
+		it("clears an optional website without clearing saved profile links", () => {
+			expect(normalizeBrandUpdate({ website: " " })).toEqual({ ok: true, updates: { website: null } });
+		});
+
+		it.each([
+			[
+				"https://www.google.com/maps/place/Example+Cafe?cid=123",
+				"https://www.google.com/maps/place/Example+Cafe?cid=123",
+			],
+			["https://maps.app.goo.gl/ExampleCafe", "https://maps.app.goo.gl/ExampleCafe"],
+			["https://instagram.com/examplecafe", "https://instagram.com/examplecafe"],
+		])("moves a pasted profile URL into profile links", (website, profileLink) => {
+			expect(normalizeBrandUpdate({ website, profileLinks: ["https://listings.example/acme"] })).toEqual({
+				ok: true,
+				updates: { website: null, profileLinks: ["https://listings.example/acme", profileLink] },
+			});
+		});
+
+		it("keeps the full link when a new profile arrives without a replacement list", () => {
+			expect(normalizeBrandUpdate({ website: "https://facebook.com/examplecafe" })).toEqual({
+				ok: true,
+				updates: { website: null },
+				movedProfileLink: "https://facebook.com/examplecafe",
+			});
+		});
+
 		it("adds a scheme to a bare domain", () => {
 			const result = normalizeBrandUpdate({ website: "acme.com" });
 			expect(result).toEqual({ ok: true, updates: { website: "https://acme.com/" } });
@@ -58,6 +84,10 @@ describe("normalizeBrandUpdate", () => {
 	});
 
 	describe("additionalDomains", () => {
+		it("keeps platform hosts out of owned domains", () => {
+			expect(normalizeBrandUpdate({ additionalDomains: ["https://instagram.com/examplecafe"] }).ok).toBe(false);
+		});
+
 		it("cleans and de-duplicates valid domains", () => {
 			const result = normalizeBrandUpdate({
 				additionalDomains: ["https://www.acme.com/path", "acme.com", "blog.acme.io"],

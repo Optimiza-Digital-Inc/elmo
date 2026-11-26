@@ -3,12 +3,13 @@ import { Button, buttonVariants } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { useState } from "react";
+import { BusinessLinkFields, type BusinessLinkValues } from "@/components/business-link-fields";
 import FullPageCard from "@/components/full-page-card";
 import { PlatformSelectionStep } from "@/components/platform-selection-step";
 import { WriteErrorMessage } from "@/components/write-error-message";
 import { useOrganizationsChanged } from "@/hooks/use-organizations";
 import { useOrganizationParams } from "@/hooks/use-route-params";
-import { validateWebsiteUrl } from "@/lib/brand-website";
+import { normalizeBusinessWebsite } from "@/lib/business-links";
 import { trackEvent } from "@/lib/posthog";
 import { pageHead } from "@/lib/route-head";
 import { useWriteErrorMessage } from "@/lib/write-errors";
@@ -36,7 +37,8 @@ function NewBrandPage() {
 	const { organizationId, organizationName, blocked } = Route.useLoaderData();
 	const organizationParams = useOrganizationParams();
 	const [step, setStep] = useState<"details" | "platforms">("details");
-	const [details, setDetails] = useState({ brandName: "", website: "" });
+	const [brandName, setBrandName] = useState("");
+	const [links, setLinks] = useState<BusinessLinkValues>({ website: "", profileLinks: [] });
 	const [platformState, setPlatformState] = useState<NonNullable<OnboardingPlatformState> | null>(null);
 	const [selected, setSelected] = useState<Set<string>>(new Set());
 	const [isLoading, setIsLoading] = useState(false);
@@ -45,7 +47,7 @@ function NewBrandPage() {
 	const navigate = useNavigate();
 	const writeError = useWriteErrorMessage();
 
-	const createBrand = async (brandName: string, website: string, enabledModels: string[] | null) => {
+	const createBrand = async (enabledModels: string[] | null) => {
 		setIsLoading(true);
 		setError("");
 
@@ -53,12 +55,12 @@ function NewBrandPage() {
 			const { brandSlug } = await createBrandInOrgFn({
 				data: {
 					brandName,
-					website,
+					...links,
 					organizationId,
 					...(enabledModels && enabledModels.length > 0 && { enabledModels }),
 				},
 			});
-			trackEvent("brand_created", { has_website: Boolean(website) });
+			trackEvent("brand_created", { has_website: Boolean(links.website) });
 
 			await organizationsChanged(() =>
 				navigate({ to: "/app/org/$org/brand/$brand", params: { ...organizationParams, brand: brandSlug } }),
@@ -70,13 +72,11 @@ function NewBrandPage() {
 		}
 	};
 
-	const handleDetailsSubmit = async (formData: FormData) => {
-		const brandName = (formData.get("brandName") as string)?.trim() ?? "";
-		const website = (formData.get("website") as string)?.trim() ?? "";
+	const handleDetailsSubmit = async () => {
 		setError("");
 
-		const validation = validateWebsiteUrl(website);
-		if (!validation.isValid) {
+		const validation = normalizeBusinessWebsite(links.website);
+		if (!validation.ok) {
 			setError(validation.error);
 			return;
 		}
@@ -85,10 +85,9 @@ function NewBrandPage() {
 		try {
 			const state = await getOnboardingPlatformStateFn({ data: { organizationId } });
 			if (!state) {
-				await createBrand(brandName, website, null);
+				await createBrand(null);
 				return;
 			}
-			setDetails({ brandName, website });
 			setPlatformState(state);
 			setSelected(new Set(state.defaultSelected));
 			setStep("platforms");
@@ -121,7 +120,7 @@ function NewBrandPage() {
 
 	if (step === "platforms" && platformState) {
 		return (
-			<FullPageCard title={`Create ${details.brandName}`} subtitle="Choose which AI platforms to track">
+			<FullPageCard title={`Create ${brandName}`} subtitle="Choose which AI platforms to track">
 				<PlatformSelectionStep
 					state={platformState}
 					selected={selected}
@@ -129,7 +128,7 @@ function NewBrandPage() {
 					disabled={isLoading}
 					error={error}
 					onBack={() => setStep("details")}
-					onSubmit={() => createBrand(details.brandName, details.website, [...selected])}
+					onSubmit={() => createBrand([...selected])}
 					submitLabel={isLoading ? "Creating..." : "Create brand"}
 				/>
 			</FullPageCard>
@@ -148,22 +147,12 @@ function NewBrandPage() {
 						placeholder="Acme"
 						required
 						disabled={isLoading}
-						defaultValue={details.brandName}
+						value={brandName}
+						onChange={(event) => setBrandName(event.target.value)}
 					/>
 				</div>
 
-				<div className="space-y-2">
-					<Label htmlFor="website">Website</Label>
-					<Input
-						id="website"
-						name="website"
-						type="text"
-						placeholder="example.com"
-						required
-						disabled={isLoading}
-						defaultValue={details.website}
-					/>
-				</div>
+				<BusinessLinkFields value={links} onChange={setLinks} disabled={isLoading} />
 
 				{error && (
 					<p className="text-sm text-destructive">

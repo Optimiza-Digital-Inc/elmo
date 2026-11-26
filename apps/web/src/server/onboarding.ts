@@ -18,6 +18,7 @@ export const startAnalyzeBrandFn = createServerFn({ method: "POST" })
 			brandId: z.string().min(1),
 			stage: researchStage,
 			website: z.string().min(1),
+			source: z.enum(["website", "profile"]).optional(),
 			brandName: z.string().optional(),
 			location: z.object({ country: place, city: place, serviceArea: place }).optional(),
 		}),

@@ -15,12 +15,14 @@ import { createApiHandler, withMethodGuard } from "@/lib/api/handler";
 import { offsetOf, paginationOf, paging } from "@/lib/api/query";
 import { competitorSchema, competitorsListSchema } from "@/lib/api/schemas/competitors";
 import { brandScopeCondition, requireBrandInScope } from "@/lib/api/scope";
+import { normalizeProfileLinks, ownedDomainInputsSchema, profileLinksSchema } from "@/lib/business-links";
 import { listCompetitors, toCompetitorSummary } from "@/server/competitors-core";
 
 const createCompetitorBody = z.object({
 	brandId: z.string().trim().min(1, "brandId is required"),
 	name: z.string().trim().min(1, "name must be a non-empty string"),
-	domains: z.array(z.string()).optional(),
+	domains: ownedDomainInputsSchema.optional(),
+	profileLinks: profileLinksSchema.optional(),
 	aliases: z.array(z.string()).optional(),
 });
 
@@ -56,7 +58,7 @@ export const Route = createFileRoute("/api/v1/competitors/")({
 				status: 201,
 				scopes: ["write"],
 				handle: async ({ body, auth }) => {
-					const { brandId, name, domains, aliases } = body;
+					const { brandId, name, domains, profileLinks, aliases } = body;
 
 					const brand = await requireBrandInScope(auth, brandId, "body");
 
@@ -71,6 +73,7 @@ export const Route = createFileRoute("/api/v1/competitors/")({
 								brandId,
 								name,
 								domains: dedupeDomains(domains ?? []),
+								profileLinks: normalizeProfileLinks(profileLinks ?? []),
 								aliases: dedupeAliases(aliases ?? []),
 							})
 							.returning();

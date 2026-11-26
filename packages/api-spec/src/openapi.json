@@ -413,7 +413,7 @@
 			},
 			"CreateBrandRequest": {
 				"type": "object",
-				"description": "Create a brand. Skips onboarding. The first entry in `domains` is treated as the brand's primary website; the rest are stored as additional domains.",
+				"description": "Create a brand. Skips onboarding. If domains are provided, the first entry sets the primary website.",
 				"properties": {
 					"id": {
 						"type": "string",
@@ -428,8 +428,14 @@
 						"items": {
 							"type": "string"
 						},
-						"minItems": 1,
-						"description": "Brand domains. The first entry is the primary website; remaining entries are additional domains."
+						"description": "Owned domains, if available. The first entry sets the primary website."
+					},
+					"profileLinks": {
+						"type": "array",
+						"items": {
+							"type": "string"
+						},
+						"description": "Full public HTTP or HTTPS profile URLs, such as Google Business Profile or social media links."
 					},
 					"aliases": {
 						"type": "array",
@@ -452,6 +458,13 @@
 									"items": {
 										"type": "string"
 									}
+								},
+								"profileLinks": {
+									"type": "array",
+									"items": {
+										"type": "string"
+									},
+									"description": "Full public HTTP or HTTPS profile URLs, such as Google Business Profile or social media links."
 								},
 								"aliases": {
 									"type": "array",
@@ -494,11 +507,11 @@
 						"minLength": 1
 					}
 				},
-				"required": ["id", "name", "domains"]
+				"required": ["id", "name"]
 			},
 			"UpdateBrandRequest": {
 				"type": "object",
-				"description": "Update brand-level fields. At least one field must be provided. Provided arrays replace the stored values verbatim. When `domains` is provided, the first entry becomes the primary website and the rest become additional domains. Prompts and competitors are managed via /prompts and /competitors.",
+				"description": "Update brand-level fields. At least one field must be provided. Provided arrays replace the stored values. Prompts and competitors are managed via /prompts and /competitors.",
 				"minProperties": 1,
 				"properties": {
 					"brandName": {
@@ -510,8 +523,14 @@
 						"items": {
 							"type": "string"
 						},
-						"minItems": 1,
-						"description": "Brand domains. The first entry is the primary website; remaining entries are additional domains."
+						"description": "Owned domains. The first entry sets the primary website. An empty array clears the website and additional domains."
+					},
+					"profileLinks": {
+						"type": "array",
+						"items": {
+							"type": "string"
+						},
+						"description": "Full public HTTP or HTTPS profile URLs, such as Google Business Profile or social media links."
 					},
 					"aliases": {
 						"type": "array",
@@ -540,7 +559,14 @@
 						"items": {
 							"type": "string"
 						},
-						"description": "Brand domains. The first entry is the primary website; remaining entries are additional domains."
+						"description": "Owned domains. Includes the primary website domain when one is set."
+					},
+					"profileLinks": {
+						"type": "array",
+						"items": {
+							"type": "string"
+						},
+						"description": "Full public HTTP or HTTPS profile URLs, such as Google Business Profile or social media links."
 					},
 					"aliases": {
 						"type": "array",
@@ -582,6 +608,7 @@
 					"id",
 					"name",
 					"domains",
+					"profileLinks",
 					"aliases",
 					"enabled",
 					"onboarded",
@@ -633,7 +660,15 @@
 						"type": "array",
 						"items": {
 							"type": "string"
-						}
+						},
+						"description": "Domains owned by the competitor."
+					},
+					"profileLinks": {
+						"type": "array",
+						"items": {
+							"type": "string"
+						},
+						"description": "Full public HTTP or HTTPS profile URLs, such as Google Business Profile or social media links."
 					},
 					"aliases": {
 						"type": "array",
@@ -650,7 +685,7 @@
 						"format": "date-time"
 					}
 				},
-				"required": ["id", "brandId", "name", "domains", "aliases", "createdAt", "updatedAt"]
+				"required": ["id", "brandId", "name", "domains", "profileLinks", "aliases", "createdAt", "updatedAt"]
 			},
 			"CompetitorsList": {
 				"type": "object",
@@ -692,7 +727,15 @@
 						"type": "array",
 						"items": {
 							"type": "string"
-						}
+						},
+						"description": "Domains owned by the competitor."
+					},
+					"profileLinks": {
+						"type": "array",
+						"items": {
+							"type": "string"
+						},
+						"description": "Full public HTTP or HTTPS profile URLs, such as Google Business Profile or social media links."
 					},
 					"aliases": {
 						"type": "array",
@@ -705,7 +748,7 @@
 			},
 			"UpdateCompetitorRequest": {
 				"type": "object",
-				"description": "Update a competitor. At least one field must be provided. Provided arrays replace the stored values verbatim.",
+				"description": "Update a competitor. At least one field must be provided. Provided arrays replace the stored values.",
 				"minProperties": 1,
 				"properties": {
 					"name": {
@@ -716,7 +759,15 @@
 						"type": "array",
 						"items": {
 							"type": "string"
-						}
+						},
+						"description": "Domains owned by the competitor."
+					},
+					"profileLinks": {
+						"type": "array",
+						"items": {
+							"type": "string"
+						},
+						"description": "Full public HTTP or HTTPS profile URLs, such as Google Business Profile or social media links."
 					},
 					"aliases": {
 						"type": "array",

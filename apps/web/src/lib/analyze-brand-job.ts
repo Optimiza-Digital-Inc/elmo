@@ -24,10 +24,15 @@ interface BrandResearchInput extends AnalyzeBrandOptions {
 }
 
 export async function enqueueBrandResearch(input: BrandResearchInput): Promise<string> {
-	const { brandId, stage, website, brandName, location } = input;
+	const { brandId, stage, website, brandName, location, source } = input;
 	const queue = queues[stage];
 	const boss = await getBoss();
-	const researchKey = JSON.stringify([cleanOnboardingUrl(website) || website, brandName ?? "", location ?? null]);
+	const researchKey = JSON.stringify([
+		cleanOnboardingUrl(website) || website,
+		brandName ?? "",
+		location ?? null,
+		source ?? "website",
+	]);
 	const jobs = await boss.findJobs(queue, { data: { brandId, researchKey } });
 	const inFlight = jobs.find((job) => IN_FLIGHT_STATES.has(job.state));
 	if (inFlight) return inFlight.id;

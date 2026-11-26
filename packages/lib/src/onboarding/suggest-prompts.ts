@@ -10,10 +10,11 @@ import {
 	websiteExcerptBlock,
 } from "./analyze";
 import { runStructuredResearchPrompt } from "./llm";
-import { cleanDomain, cleanUrl } from "./utils";
+import { cleanUrl } from "./utils";
 
 export interface SuggestPromptsOptions {
-	website: string;
+	website: string | null;
+	profileUrl?: string;
 	brandName: string;
 	existingPrompts: string[];
 	existingTags?: string[];
@@ -52,22 +53,22 @@ function buildPrompt(args: {
 			? `\nPrompts the brand already has — do NOT repeat these, reword them, or return trivial variants (plurals, reordered words, swapped synonyms):\n${args.existingPrompts.map((p) => `- ${p}`).join("\n")}\n`
 			: "";
 
-	return `Suggest ${args.count} more AI tracking prompts for ${args.brandName} (${args.analysisUrl}).
+	return `Suggest ${args.count} more AI tracking prompts for ${args.brandName}${args.analysisUrl ? ` (${args.analysisUrl})` : ""}.
 ${excerptBlock}${competitorsLine}${tagsLine}${existingBlock}
-Each prompt is something a real person would type into ChatGPT where an answer could plausibly mention ${args.brandName} or its competitors. Use web search to understand what the brand sells and who buys it, then cover angles the existing prompts miss: other product categories, audiences, use cases, price points, regions, or buying stages.`;
+Each prompt is something a real person would type into ChatGPT where an answer could plausibly mention ${args.brandName} or its competitors. Use web search to understand what the brand sells and who buys it. When the business cannot be identified confidently, use the existing prompts and tracked competitors for context and avoid inventing facts. When the context is sufficient, then cover angles the existing prompts miss: other product categories, audiences, use cases, price points, regions, or buying stages.`;
 }
 
 export async function suggestPrompts(options: SuggestPromptsOptions): Promise<OnboardingPrompt[]> {
 	const count = options.count ?? DEFAULT_COUNT;
-	const analysisUrl = cleanUrl(options.website);
-	if (!cleanDomain(options.website) || !analysisUrl) {
+	const analysisUrl = cleanUrl(options.website ?? options.profileUrl ?? "");
+	if (options.website && !analysisUrl) {
 		throw new Error(`Could not parse website "${options.website}"`);
 	}
 
 	const prompt = buildPrompt({
 		analysisUrl,
 		brandName: options.brandName,
-		websiteExcerpt: await safeGetExcerpt(analysisUrl),
+		websiteExcerpt: options.website ? await safeGetExcerpt(analysisUrl) : "",
 		existingPrompts: options.existingPrompts,
 		existingTags: options.existingTags ?? [],
 		competitors: options.competitors ?? [],

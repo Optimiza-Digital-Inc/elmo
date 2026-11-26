@@ -9,7 +9,7 @@ interface RowBase {
 }
 
 export type OrganizationRow =
-	| (RowBase & { kind: "brand"; id: string; website: string })
+	| (RowBase & { kind: "brand"; id: string; website: string | null })
 	| (RowBase & { kind: "new-brand" })
 	| (RowBase & { kind: "set-up" });
 

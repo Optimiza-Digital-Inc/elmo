@@ -34,8 +34,9 @@ export const brands = pgTable(
 		id: text("id").primaryKey().notNull(),
 		name: text("name").notNull(),
 		slug: text("slug"),
-		website: text("website").notNull(),
+		website: text("website"),
 		additionalDomains: text("additional_domains").array().notNull().default([]),
+		profileLinks: text("profile_links").array().notNull().default([]),
 		aliases: text("aliases").array().notNull().default([]),
 		enabled: boolean("enabled").default(true).notNull(),
 		onboarded: boolean("onboarded").default(false).notNull(),
@@ -100,6 +101,7 @@ export const competitors = pgTable(
 			.notNull(),
 		name: text("name").notNull(),
 		domains: text("domains").array().notNull().default([]),
+		profileLinks: text("profile_links").array().notNull().default([]),
 		aliases: text("aliases").array().notNull().default([]),
 		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 		updatedAt: timestamp("updated_at", { withTimezone: true })

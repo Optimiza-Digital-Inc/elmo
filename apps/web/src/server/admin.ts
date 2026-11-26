@@ -772,7 +772,14 @@ function promptWorkflowStatus(
 }
 
 function brandWorkflowSummary(
-	brand: { id: string; slug: string | null; organizationId: string; name: string; website: string; enabled: boolean },
+	brand: {
+		id: string;
+		slug: string | null;
+		organizationId: string;
+		name: string;
+		website: string | null;
+		enabled: boolean;
+	},
 	brandPrompts: { id: string; value: string; enabled: boolean; createdAt: Date }[],
 	context: WorkflowContext,
 ) {

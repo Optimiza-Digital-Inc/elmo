@@ -17,6 +17,8 @@ import {
 import { computeSystemTags, sanitizeUserTags } from "@workspace/lib/tag-utils";
 import { count, desc, eq, type SQL } from "drizzle-orm";
 import { z } from "zod";
+import { normalizeBrandUpdate } from "@/lib/brand-settings";
+import { normalizeProfileLinks, ownedDomainInputsSchema, profileLinksSchema } from "@/lib/business-links";
 import { createMultiplePromptJobSchedulers } from "@/lib/job-scheduler";
 
 export class BrandConflictError extends Error {
@@ -34,8 +36,9 @@ export class BrandNotFoundError extends Error {
 }
 
 const competitorInputSchema = z.object({
-	name: z.string().min(1),
-	domains: z.array(z.string()).optional().default([]),
+	name: z.string().trim().min(1),
+	domains: ownedDomainInputsSchema.optional().default([]),
+	profileLinks: profileLinksSchema.optional(),
 	aliases: z.array(z.string()).optional().default([]),
 });
 
@@ -50,8 +53,9 @@ type PromptInput = z.infer<typeof promptInputSchema>;
 
 export const createBrandInputSchema = z.object({
 	id: z.string().min(1),
-	name: z.string().min(1),
-	domains: z.array(z.string()).min(1),
+	name: z.string().trim().min(1),
+	domains: ownedDomainInputsSchema.optional(),
+	profileLinks: profileLinksSchema.optional(),
 	aliases: z.array(z.string()).optional(),
 	competitors: z.array(competitorInputSchema).optional(),
 	prompts: z.array(promptInputSchema).optional(),
@@ -62,7 +66,8 @@ export const createBrandInputSchema = z.object({
 
 export const updateBrandBodySchema = z.object({
 	brandName: z.string().min(1).optional(),
-	domains: z.array(z.string()).min(1).optional(),
+	domains: ownedDomainInputsSchema.optional(),
+	profileLinks: profileLinksSchema.optional(),
 	aliases: z.array(z.string()).optional(),
 	enabled: z.boolean().optional(),
 });
@@ -70,7 +75,8 @@ export const updateBrandBodySchema = z.object({
 export const wizardOnboardingInputSchema = z.object({
 	brandId: z.string().min(1),
 	brandName: z.string().min(1).optional(),
-	website: z.string().min(1).optional(),
+	website: z.string().nullish(),
+	profileLinks: profileLinksSchema.optional(),
 	additionalDomains: z.array(z.string()).optional(),
 	aliases: z.array(z.string()).optional(),
 	competitors: z.array(competitorInputSchema).optional(),
@@ -80,8 +86,9 @@ export const wizardOnboardingInputSchema = z.object({
 export interface CreateBrandInput {
 	id: string;
 	name: string;
-	website: string;
+	website: string | null;
 	additionalDomains?: string[];
+	profileLinks?: string[];
 	aliases?: string[];
 	competitors?: CompetitorInput[];
 	prompts?: PromptInput[];
@@ -95,8 +102,9 @@ export interface CreateBrandInput {
 export interface UpdateBrandInput {
 	brandId: string;
 	brandName?: string;
-	website?: string;
+	website?: string | null;
 	additionalDomains?: string[];
+	profileLinks?: string[];
 	aliases?: string[];
 	enabled?: boolean;
 }
@@ -108,6 +116,7 @@ export interface BrandResult {
 	name: string;
 	organizationId: string;
 	domains: string[];
+	profileLinks: string[];
 	aliases: string[];
 	enabled: boolean;
 	onboarded: boolean;
@@ -117,26 +126,14 @@ export interface BrandResult {
 	updatedAt: Date;
 }
 
-function validateAndFormatWebsite(url: string): string {
-	const trimmed = url.trim();
-	const formatted = trimmed.startsWith("http://") || trimmed.startsWith("https://") ? trimmed : `https://${trimmed}`;
-	const parsed = new URL(formatted);
-	if (!["http:", "https:"].includes(parsed.protocol)) {
-		throw new Error("Website URL must use http or https");
-	}
-	if (!parsed.hostname) {
-		throw new Error("Website URL must have a valid hostname");
-	}
-	return formatted;
-}
-
 export function buildBrandResult(row: typeof brands.$inferSelect): BrandResult {
-	const websiteHost = new URL(row.website).hostname.replace(/^www\./, "");
+	const websiteHost = row.website ? new URL(row.website).hostname.replace(/^www\./, "") : null;
 	return {
 		id: row.id,
 		name: row.name,
 		organizationId: row.organizationId,
-		domains: [websiteHost, ...row.additionalDomains],
+		domains: [websiteHost, ...row.additionalDomains].filter((domain) => domain !== null),
+		profileLinks: row.profileLinks,
 		aliases: row.aliases,
 		enabled: row.enabled,
 		onboarded: row.onboarded,
@@ -148,26 +145,27 @@ export function buildBrandResult(row: typeof brands.$inferSelect): BrandResult {
 }
 
 export class InvalidDomainsError extends Error {
-	constructor(message = "domains: at least one valid domain is required") {
+	constructor(message = "domains: provide valid owned domains or an empty array") {
 		super(message);
 		this.name = "InvalidDomainsError";
 	}
 }
 
-function splitDomainsForStorage(domains: string[]): { website: string; additionalDomains: string[] } {
+function splitDomainsForStorage(domains: string[]): { website: string | null; additionalDomains: string[] } {
 	const cleaned = dedupeDomains(domains);
-	if (cleaned.length === 0) throw new InvalidDomainsError();
+	if (domains.length > 0 && cleaned.length === 0) throw new InvalidDomainsError();
 	const [primary, ...rest] = cleaned;
-	return { website: `https://${primary}`, additionalDomains: rest };
+	return { website: primary ? `https://${primary}` : null, additionalDomains: rest };
 }
 
 export function apiCreateInputToInternal(input: z.infer<typeof createBrandInputSchema>): CreateBrandInput {
-	const { website, additionalDomains } = splitDomainsForStorage(input.domains);
+	const { website, additionalDomains } = splitDomainsForStorage(input.domains ?? []);
 	return {
 		id: input.id,
 		name: input.name,
 		website,
 		additionalDomains,
+		profileLinks: input.profileLinks,
 		aliases: input.aliases,
 		competitors: input.competitors,
 		prompts: input.prompts,
@@ -182,6 +180,7 @@ export function apiUpdateInputToInternal(
 	const result: UpdateBrandInput = {
 		brandId,
 		brandName: input.brandName,
+		profileLinks: input.profileLinks,
 		aliases: input.aliases,
 		enabled: input.enabled,
 	};
@@ -195,8 +194,8 @@ export function apiUpdateInputToInternal(
 
 async function insertCompetitors(args: {
 	brandId: string;
-	websiteHost: string;
-	source: { name: string; domains: string[]; aliases: string[] }[];
+	websiteHost: string | null;
+	source: CompetitorInput[];
 	conn?: DbConnection;
 }): Promise<number> {
 	if (args.source.length === 0) return 0;
@@ -207,15 +206,21 @@ async function insertCompetitors(args: {
 	});
 	const existingDomains = new Set(existing.flatMap((c) => c.domains));
 
-	const toInsert: Array<{ brandId: string; name: string; domains: string[]; aliases: string[] }> = [];
+	const existingNames = new Set(existing.map((c) => c.name.toLowerCase()));
+	const toInsert: (typeof competitors.$inferInsert)[] = [];
 	for (const c of args.source) {
 		const cleaned = dedupeDomains(c.domains).filter((d) => d !== args.websiteHost);
-		if (cleaned.length === 0) continue;
+		if (c.domains.length > 0 && cleaned.length === 0) continue;
+		const name = c.name.trim();
+		if (cleaned.length === 0 && existingNames.has(name.toLowerCase())) continue;
 		if (cleaned.some((d) => existingDomains.has(d))) continue;
+		existingNames.add(name.toLowerCase());
+		for (const domain of cleaned) existingDomains.add(domain);
 		toInsert.push({
 			brandId: args.brandId,
-			name: c.name.trim(),
+			name,
 			domains: cleaned,
+			profileLinks: normalizeProfileLinks(c.profileLinks ?? []),
 			aliases: dedupeAliases(c.aliases),
 		});
 	}
@@ -230,7 +235,7 @@ async function insertCompetitors(args: {
 async function insertPrompts(args: {
 	brandId: string;
 	brandName: string;
-	website: string;
+	website: string | null;
 	source: { value: string; tags: string[]; enabled: boolean }[];
 	dedupeAgainstExisting: boolean;
 	conn?: DbConnection;
@@ -279,8 +284,7 @@ async function insertPrompts(args: {
 }
 
 export async function createBrand(input: CreateBrandInput): Promise<BrandResult> {
-	const formattedWebsite = validateAndFormatWebsite(input.website);
-	const websiteHost = new URL(formattedWebsite).hostname.replace(/^www\./, "");
+	const websiteHost = input.website ? new URL(input.website).hostname.replace(/^www\./, "") : null;
 
 	const additionalDomains = dedupeDomains(input.additionalDomains ?? []).filter((d) => d !== websiteHost);
 	const aliases = dedupeAliases(input.aliases ?? []);
@@ -301,8 +305,9 @@ export async function createBrand(input: CreateBrandInput): Promise<BrandResult>
 				organizationId,
 				name: input.name,
 				slug,
-				website: formattedWebsite,
+				website: input.website,
 				additionalDomains,
+				profileLinks: normalizeProfileLinks(input.profileLinks ?? []),
 				aliases,
 				enabled: true,
 				onboarded: true,
@@ -314,18 +319,14 @@ export async function createBrand(input: CreateBrandInput): Promise<BrandResult>
 		await insertCompetitors({
 			brandId: input.id,
 			websiteHost,
-			source: (input.competitors ?? []).map((c) => ({
-				name: c.name,
-				domains: c.domains ?? [],
-				aliases: c.aliases ?? [],
-			})),
+			source: input.competitors ?? [],
 			conn: tx,
 		});
 
 		return await insertPrompts({
 			brandId: input.id,
 			brandName: input.name,
-			website: formattedWebsite,
+			website: input.website,
 			source: (input.prompts ?? []).map((p) => ({
 				value: p.value,
 				tags: sanitizeUserTags(p.tags ?? []),
@@ -348,64 +349,55 @@ export async function createBrand(input: CreateBrandInput): Promise<BrandResult>
 	return buildBrandResult(refreshed!);
 }
 
-export async function updateBrand(input: UpdateBrandInput): Promise<BrandResult> {
-	const existing = await db.query.brands.findFirst({ where: eq(brands.id, input.brandId) });
+async function updateBrandRow(input: UpdateBrandInput, tx: DbConnection) {
+	const normalized = normalizeBrandUpdate({
+		name: input.brandName,
+		website: input.website,
+		additionalDomains: input.additionalDomains,
+		profileLinks: input.profileLinks,
+		aliases: input.aliases,
+	});
+	if (!normalized.ok) throw new Error(normalized.error);
+	const [existing] = await tx.select().from(brands).where(eq(brands.id, input.brandId)).for("update");
 	if (!existing) throw new BrandNotFoundError(input.brandId);
 
-	const formattedWebsite = input.website ? validateAndFormatWebsite(input.website) : null;
-	const websiteHost = formattedWebsite
-		? new URL(formattedWebsite).hostname.replace(/^www\./, "")
-		: existing.website
-			? new URL(existing.website).hostname.replace(/^www\./, "")
-			: null;
-
-	const patch: Partial<typeof brands.$inferInsert> = { updatedAt: new Date() };
-	if (input.brandName !== undefined) patch.name = input.brandName;
-	if (formattedWebsite !== null) patch.website = formattedWebsite;
-	if (input.additionalDomains !== undefined) {
-		patch.additionalDomains = dedupeDomains(input.additionalDomains).filter((d) => d !== websiteHost);
+	const updates = normalized.updates;
+	const website = updates.website === undefined ? existing.website : updates.website;
+	const websiteHost = website ? new URL(website).hostname.replace(/^www\./, "") : null;
+	if (updates.additionalDomains) updates.additionalDomains = updates.additionalDomains.filter((d) => d !== websiteHost);
+	if (normalized.movedProfileLink) {
+		updates.profileLinks = normalizeProfileLinks([...existing.profileLinks, normalized.movedProfileLink]);
 	}
-	if (input.aliases !== undefined) patch.aliases = dedupeAliases(input.aliases);
-	if (input.enabled !== undefined) patch.enabled = input.enabled;
 
-	await db.update(brands).set(patch).where(eq(brands.id, input.brandId));
-	const refreshed = await db.query.brands.findFirst({ where: eq(brands.id, input.brandId) });
-	return buildBrandResult(refreshed!);
+	const [updated] = await tx
+		.update(brands)
+		.set({ ...updates, enabled: input.enabled, updatedAt: new Date() })
+		.where(eq(brands.id, input.brandId))
+		.returning();
+	return updated;
+}
+
+export async function updateBrand(input: UpdateBrandInput): Promise<BrandResult> {
+	const updated = await db.transaction((tx) => updateBrandRow(input, tx));
+	return buildBrandResult(updated);
 }
 
 export async function saveWizardOnboarding(input: WizardOnboardingInput): Promise<BrandResult> {
-	await updateBrand({
-		brandId: input.brandId,
-		brandName: input.brandName,
-		website: input.website,
-		additionalDomains: input.additionalDomains,
-		aliases: input.aliases,
-	});
-
-	await db.update(brands).set({ onboarded: true, updatedAt: new Date() }).where(eq(brands.id, input.brandId));
-
-	const existing = await db.query.brands.findFirst({ where: eq(brands.id, input.brandId) });
-	if (!existing) throw new BrandNotFoundError(input.brandId);
-	const websiteHost = new URL(existing.website).hostname.replace(/^www\./, "");
-
-	// Both inserts check a usage count first, so they run under one lock: two
-	// saves racing each other must not both spend the same last slot.
-	const wizardPromptIds = await withQuotaLock(existing.organizationId, async (tx) => {
+	const organizationId = await getBrandOrganizationId(input.brandId);
+	return withQuotaLock(organizationId, async (tx, afterCommit) => {
+		const brand = await updateBrandRow(input, tx);
+		const websiteHost = brand.website ? new URL(brand.website).hostname.replace(/^www\./, "") : null;
 		await insertCompetitors({
 			brandId: input.brandId,
 			websiteHost,
-			source: (input.competitors ?? []).map((c) => ({
-				name: c.name,
-				domains: c.domains ?? [],
-				aliases: c.aliases ?? [],
-			})),
+			source: input.competitors ?? [],
 			conn: tx,
 		});
 
-		return insertPrompts({
+		const promptIds = await insertPrompts({
 			brandId: input.brandId,
-			brandName: existing.name,
-			website: existing.website,
+			brandName: brand.name,
+			website: brand.website,
 			source: (input.prompts ?? []).map((p) => ({
 				value: p.value,
 				tags: sanitizeUserTags(p.tags ?? []),
@@ -413,13 +405,12 @@ export async function saveWizardOnboarding(input: WizardOnboardingInput): Promis
 			})),
 			dedupeAgainstExisting: true,
 			conn: tx,
-			organizationId: existing.organizationId,
+			organizationId,
 		});
+		const [updated] = await tx.update(brands).set({ onboarded: true }).where(eq(brands.id, input.brandId)).returning();
+		afterCommit(() => createMultiplePromptJobSchedulers(promptIds));
+		return buildBrandResult(updated);
 	});
-	await createMultiplePromptJobSchedulers(wizardPromptIds);
-
-	const refreshed = await db.query.brands.findFirst({ where: eq(brands.id, input.brandId) });
-	return buildBrandResult(refreshed!);
 }
 
 export interface ListBrandsFilters {
