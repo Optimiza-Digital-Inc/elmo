@@ -4,6 +4,7 @@
  * pull in DB + provider clients).
  */
 import type { BrandLocationSuggestion, OnboardingSuggestion } from "@workspace/lib/onboarding";
+import { fn } from "storybook/test";
 
 let _suggestion: OnboardingSuggestion | null = null;
 let _delayMs = 0;
@@ -59,7 +60,7 @@ export const cancelAnalyzeBrandFn = async (_args: { data: unknown }) => {
 	return { ok: true as const };
 };
 
-export const updateOnboardedBrandFn = async (_args: { data: unknown }) => {
+export const updateOnboardedBrandFn = fn(async (_args: { data: unknown }) => {
 	if (_delayMs > 0) await new Promise((r) => setTimeout(r, Math.min(_delayMs, 800)));
 	return {
 		id: "mock-brand-id",
@@ -71,7 +72,7 @@ export const updateOnboardedBrandFn = async (_args: { data: unknown }) => {
 		createdAt: new Date(),
 		updatedAt: new Date(),
 	};
-};
+});
 
 // Other re-exports from the real module so type-only imports resolve.
 export type { OnboardingSuggestion } from "@workspace/lib/onboarding";

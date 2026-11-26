@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addedPlatforms, promptsGainingPremium } from "@/lib/run-config-changes";
+import { addedPlatforms, promptsNeedingImmediateRun } from "@/lib/run-config-changes";
 
 const CONFIGURED = ["chatgpt", "perplexity", "gemini"];
 
@@ -25,23 +25,37 @@ describe("addedPlatforms", () => {
 	});
 });
 
-describe("promptsGainingPremium", () => {
+describe("promptsNeedingImmediateRun", () => {
 	const before = new Map([
-		["kept", { premiumModels: ["claude"] }],
-		["grew", { premiumModels: ["claude"] }],
-		["shrank", { premiumModels: ["claude", "grok"] }],
+		["kept", { enabled: true, premiumModels: ["claude"] }],
+		["grew", { enabled: true, premiumModels: ["claude"] }],
+		["shrank", { enabled: true, premiumModels: ["claude", "grok"] }],
 	]);
 
 	it("reports only the prompts that gained a model", () => {
 		const after = [
-			{ id: "kept", premiumModels: ["claude"] },
-			{ id: "grew", premiumModels: ["claude", "grok"] },
-			{ id: "shrank", premiumModels: ["claude"] },
+			{ id: "kept", enabled: true, premiumModels: ["claude"] },
+			{ id: "grew", enabled: true, premiumModels: ["claude", "grok"] },
+			{ id: "shrank", enabled: true, premiumModels: ["claude"] },
 		];
-		expect(promptsGainingPremium(before, after)).toEqual(["grew"]);
+		expect(promptsNeedingImmediateRun(before, after)).toEqual(["grew"]);
 	});
 
 	it("ignores prompts created by the same save", () => {
-		expect(promptsGainingPremium(before, [{ id: "fresh", premiumModels: ["claude"] }])).toEqual([]);
+		expect(promptsNeedingImmediateRun(before, [{ id: "fresh", enabled: true, premiumModels: ["claude"] }])).toEqual([]);
+	});
+
+	it("starts tracking a saved prompt only when it is enabled", () => {
+		const saved = { enabled: false, premiumModels: [] };
+		const before = new Map([
+			["enable", saved],
+			["leave-off", saved],
+		]);
+		expect(
+			promptsNeedingImmediateRun(before, [
+				{ ...saved, id: "enable", enabled: true },
+				{ ...saved, id: "leave-off", premiumModels: ["claude"] },
+			]),
+		).toEqual(["enable"]);
 	});
 });

@@ -17,19 +17,15 @@ export function addedPlatforms(previous: string[] | null, next: string[] | null,
 	return (next ?? configured).filter((model) => !before.has(model));
 }
 
-/**
- * Prompts that gained a premium model in a save. Prompts created by the same
- * save are excluded — their chain starts immediately anyway, and expediting a
- * job that doesn't exist yet would race it.
- */
-export function promptsGainingPremium(
-	before: Map<string, { premiumModels: string[] }>,
-	after: { id: string; premiumModels: string[] }[],
+export function promptsNeedingImmediateRun(
+	before: Map<string, { enabled: boolean; premiumModels: string[] }>,
+	after: { id: string; enabled: boolean; premiumModels: string[] }[],
 ): string[] {
 	return after
 		.filter((prompt) => {
 			const previous = before.get(prompt.id);
-			return previous !== undefined && prompt.premiumModels.some((model) => !previous.premiumModels.includes(model));
+			if (!prompt.enabled || !previous) return false;
+			return !previous.enabled || prompt.premiumModels.some((model) => !previous.premiumModels.includes(model));
 		})
 		.map((prompt) => prompt.id);
 }

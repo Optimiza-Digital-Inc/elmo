@@ -16,6 +16,7 @@ import {
 	setMockOnboardingError,
 	setMockOnboardingLocation,
 	setMockOnboardingSuggestion,
+	updateOnboardedBrandFn,
 } from "./_mocks/server-onboarding";
 import { setMockBrand } from "./_mocks/use-brands";
 
@@ -64,8 +65,8 @@ function useWizardSetup({
 	error?: string | null;
 	location?: BrandLocationSuggestion | null;
 }) {
+	setMockBrand(brand);
 	useEffect(() => {
-		setMockBrand(brand);
 		setMockOnboardingSuggestion(suggestion);
 		setMockOnboardingDelay(delayMs);
 		setMockOnboardingError(error);
@@ -248,6 +249,31 @@ export const Review: StoryObj = {
 		await expect(
 			canvas.getByRole("button", { name: `Start Tracking (${RICH_SUGGESTION.suggestedPrompts.length} New Prompts)` }),
 		).toBeEnabled();
+	},
+};
+
+export const SavePromptsForLater: StoryObj = {
+	render: Review.render,
+	play: async ({ canvasElement }) => {
+		const canvas = await analyzeWithoutLocation(canvasElement);
+		await canvas.findByDisplayValue("Acme");
+		await userEvent.click(canvas.getByRole("checkbox", { name: "Select all prompts" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Disable" }));
+		await expect(canvas.getByRole("button", { name: "Finish Setup" })).toBeEnabled();
+		await userEvent.click(canvas.getAllByRole("switch", { name: "Enable prompt" })[0]!);
+		updateOnboardedBrandFn.mockClear();
+		await userEvent.click(canvas.getByRole("button", { name: "Start Tracking (1 New Prompt)" }));
+		await waitFor(() =>
+			expect(updateOnboardedBrandFn).toHaveBeenCalledWith({
+				data: expect.objectContaining({
+					prompts: RICH_SUGGESTION.suggestedPrompts.map(({ prompt, tags }, index) => ({
+						value: prompt,
+						tags,
+						enabled: index === 0,
+					})),
+				}),
+			}),
+		);
 	},
 };
 

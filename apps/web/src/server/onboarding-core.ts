@@ -279,8 +279,8 @@ async function insertPrompts(args: {
 	const organizationId = args.organizationId ?? (await getBrandOrganizationId(args.brandId));
 	await assertCanAddPrompts(organizationId, rows.filter((r) => r.enabled).length, args.conn);
 
-	const inserted = await conn.insert(prompts).values(rows).returning({ id: prompts.id });
-	return inserted.map((r) => r.id);
+	const inserted = await conn.insert(prompts).values(rows).returning({ id: prompts.id, enabled: prompts.enabled });
+	return inserted.filter((row) => row.enabled).map((row) => row.id);
 }
 
 export async function createBrand(input: CreateBrandInput): Promise<BrandResult> {

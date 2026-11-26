@@ -393,8 +393,9 @@ export default function PromptWizard({ onComplete }: PromptWizardProps) {
 				}));
 
 			const promptsPayload = data.prompts
-				.filter((p) => p.enabled && p.value.trim())
-				.map((p) => ({ value: p.value.trim(), tags: p.tags, enabled: true }));
+				.filter((p) => p.value.trim())
+				.map((p) => ({ value: p.value.trim(), tags: p.tags, enabled: p.enabled }))
+				.sort((a, b) => Number(b.enabled) - Number(a.enabled));
 
 			await updateOnboardedBrandFn({
 				data: {
@@ -507,8 +508,8 @@ export default function PromptWizard({ onComplete }: PromptWizardProps) {
 				<div>
 					<h2 className="text-2xl font-bold">Prompts</h2>
 					<p className="text-muted-foreground">
-						Pick which AI tracking prompts to start with. Untick any you don't want, edit tags, or add your own at the
-						bottom.
+						Leave tracking on for prompts you want to run now. Turn it off to save a prompt for later in Settings →
+						Prompts. Remove a row to discard it.
 					</p>
 				</div>
 				<PromptsListEditor prompts={data.prompts} onChange={updatePrompts} showSystemTags={false} />

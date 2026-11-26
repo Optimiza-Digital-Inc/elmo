@@ -38,7 +38,7 @@ import {
 	getPromptsFirstEvaluatedAt,
 	type PerPromptRunStats,
 } from "@/lib/rollup-read";
-import { promptsGainingPremium } from "@/lib/run-config-changes";
+import { promptsNeedingImmediateRun } from "@/lib/run-config-changes";
 import { responseSortSchema, sentimentFilterSchema } from "@/lib/sentiment";
 import { isRedditDomain, summarizeSubreddits } from "@/lib/subreddits";
 import { getTimezoneLookbackRange, resolveTimezone } from "@/lib/timezone-utils";
@@ -443,18 +443,22 @@ export const updatePromptsFn = createServerFn({ method: "POST" })
 		});
 		if (!brand) throw new Error("Brand not found");
 
-		const existingRows = await db
-			.select({ id: prompts.id, value: prompts.value, enabled: prompts.enabled, premiumModels: prompts.premiumModels })
-			.from(prompts)
-			.where(eq(prompts.brandId, data.brandId));
-		const existingIds = new Set(existingRows.map((p) => p.id));
-		const existingById = new Map(existingRows.map((p) => [p.id, p]));
+		return withQuotaLock(brand.organizationId, async (tx, afterCommit) => {
+			const existingRows = await tx
+				.select({
+					id: prompts.id,
+					value: prompts.value,
+					enabled: prompts.enabled,
+					premiumModels: prompts.premiumModels,
+				})
+				.from(prompts)
+				.where(eq(prompts.brandId, data.brandId));
+			const existingById = new Map(existingRows.map((p) => [p.id, p]));
 
-		const { updates, inserts } = planPromptSave(data.prompts, existingRows);
-		assertAllowed(decidePromptCap(existingRows.length, inserts.length));
-		await assertPromptSaveAllowed(brand.organizationId, promptSaveDelta({ updates, inserts }));
+			const { updates, inserts } = planPromptSave(data.prompts, existingRows);
+			assertAllowed(decidePromptCap(existingRows.length, inserts.length));
+			await assertPromptSaveAllowed(brand.organizationId, promptSaveDelta({ updates, inserts }), tx);
 
-		const saved = await db.transaction(async (tx) => {
 			for (const { id, prompt, after } of updates) {
 				await tx
 					.update(prompts)
@@ -487,24 +491,14 @@ export const updatePromptsFn = createServerFn({ method: "POST" })
 				);
 			}
 
-			return tx.query.prompts.findMany({
+			const saved = await tx.query.prompts.findMany({
 				where: eq(prompts.brandId, data.brandId),
 			});
+			const newPromptIds = saved.filter((p) => p.enabled && !existingById.has(p.id)).map((p) => p.id);
+			afterCommit(() => createMultiplePromptJobSchedulers(newPromptIds));
+			afterCommit(() => expeditePromptRuns(promptsNeedingImmediateRun(existingById, saved)));
+			return saved;
 		});
-
-		const newPromptIds = saved.filter((p) => !existingIds.has(p.id)).map((p) => p.id);
-		if (newPromptIds.length > 0) {
-			createMultiplePromptJobSchedulers(newPromptIds).catch((err) =>
-				console.error("Failed to create job schedulers for new prompts:", err),
-			);
-		}
-
-		// A grounded target added to a prompt that already runs has no history of
-		// its own, so it is due immediately — but the prompt's next job is a whole
-		// cadence away, and the customer has just paid for the slot.
-		await expeditePromptRuns(promptsGainingPremium(existingById, saved));
-
-		return saved;
 	});
 
 export const getPromptWebQueryFn = createServerFn({ method: "GET" })
