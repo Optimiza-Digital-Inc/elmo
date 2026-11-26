@@ -16,10 +16,6 @@ const ONBOARDING_LLM_TARGET_HELP =
 	"Set ONBOARDING_LLM_TARGET (e.g. claude:anthropic-api) " +
 	"or configure ANTHROPIC_API_KEY / OPENAI_API_KEY / OPENROUTER_API_KEY / MISTRAL_API_KEY.";
 
-/**
- * Only the provider segment of `ONBOARDING_LLM_TARGET` is honored: each provider
- * picks its own research model (`DEFAULT_RESEARCH_MODEL`).
- */
 export function resolveResearchProvider(env: Record<string, string | undefined> = process.env): Provider {
 	const explicit = env.ONBOARDING_LLM_TARGET?.trim();
 	if (explicit) {
@@ -31,10 +27,17 @@ export function resolveResearchProvider(env: Record<string, string | undefined> 
 				`ONBOARDING_LLM_TARGET points at "${parsed.provider}" but it isn't configured. ${ONBOARDING_LLM_TARGET_HELP}`,
 			);
 		}
-		if (!provider.runStructuredResearch) {
+		const { runStructuredResearch } = provider;
+		if (!runStructuredResearch) {
 			throw new Error(
 				`ONBOARDING_LLM_TARGET points at "${parsed.provider}", which does not support structured research. ${ONBOARDING_LLM_TARGET_HELP}`,
 			);
+		}
+		if (parsed.provider === "openrouter" && parsed.model === "deepseek") {
+			return {
+				...provider,
+				runStructuredResearch: (options) => runStructuredResearch({ ...options, model: "deepseek" }),
+			};
 		}
 		return provider;
 	}

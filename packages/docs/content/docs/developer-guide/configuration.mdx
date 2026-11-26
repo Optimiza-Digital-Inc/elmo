@@ -62,6 +62,8 @@ At least one provider is required for Elmo to track visibility. See [Providers](
 
 Brand onboarding and the Opportunities report also need one direct LLM API key — `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, or `MISTRAL_API_KEY` — even if `SCRAPE_TARGETS` only uses scrapers. Elmo uses the first of those that's set; to pick one explicitly, set `ONBOARDING_LLM_TARGET` (e.g. `claude:anthropic-api`).
 
+Set `ONBOARDING_LLM_TARGET=deepseek:openrouter` with `OPENROUTER_API_KEY` to use DeepSeek V4 Pro 0813. OpenRouter restricts model inference to DeepSeek's own endpoint and uses Exa for onboarding web search.
+
 | Variable | Description |
 |----------|-------------|
 | `BRIGHTDATA_API_TOKEN` | BrightData token — recommended scraper for ChatGPT + Google AI Mode. [Sign up](https://get.brightdata.com/elmo?sid=docs) |

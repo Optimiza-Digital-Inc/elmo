@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { resolveResearchProvider } from "./llm";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
+import { resolveResearchProvider, runStructuredCompletionPrompt, runStructuredResearchPrompt } from "./llm";
 
 const ENV_KEYS = [
 	"ONBOARDING_LLM_TARGET",
@@ -23,11 +24,42 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+	vi.restoreAllMocks();
 	for (const key of ENV_KEYS) {
 		const v = savedEnv[key];
 		if (v === undefined) delete process.env[key];
 		else process.env[key] = v;
 	}
+});
+
+describe("DeepSeek research through OpenRouter", () => {
+	it.each([true, false])("restricts inference to DeepSeek with web search set to %s", async (webSearch) => {
+		process.env.OPENAI_API_KEY = "openai-key";
+		process.env.OPENROUTER_API_KEY = "openrouter-key";
+		process.env.ONBOARDING_LLM_TARGET = "deepseek:openrouter";
+		const answer = { name: "Acme" };
+		const fetchMock = vi
+			.spyOn(globalThis, "fetch")
+			.mockResolvedValue(Response.json({ choices: [{ message: { content: JSON.stringify(answer) } }] }));
+		const schema = z.object({ name: z.string() });
+
+		const object = webSearch
+			? await runStructuredResearchPrompt("Find the brand", schema)
+			: (await runStructuredCompletionPrompt("Summarize the brand", schema)).object;
+
+		expect(object).toEqual(answer);
+		const [url, request] = fetchMock.mock.calls[0];
+		expect(url).toBe("https://openrouter.ai/api/v1/chat/completions");
+		const body = JSON.parse(String(request?.body));
+		expect(body).toMatchObject({
+			model: "deepseek/deepseek-v4-pro-0813",
+			provider: { only: ["deepseek"] },
+			response_format: { type: "json_object" },
+		});
+		expect(body.tools).toEqual(
+			webSearch ? [{ type: "openrouter:web_search", parameters: { engine: "exa" } }] : undefined,
+		);
+	});
 });
 
 describe("resolveResearchProvider", () => {

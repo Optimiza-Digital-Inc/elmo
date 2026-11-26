@@ -1,6 +1,13 @@
+import { z } from "zod";
 import { getCredential } from "../../secrets";
 import { type Citation, normalizeCitationTitle } from "../../text-extraction";
-import { API_PROVIDER_MAX_OUTPUT_TOKENS, configuredWhen, reportedWebQueries, warnIfOutputCapped } from "../config";
+import {
+	API_PROVIDER_MAX_OUTPUT_TOKENS,
+	configuredWhen,
+	RESEARCH_WEB_SEARCH_MAX_USES,
+	reportedWebQueries,
+	warnIfOutputCapped,
+} from "../config";
 import type {
 	Provider,
 	ProviderOptions,
@@ -12,9 +19,8 @@ import { jsonSchemaResponseFormat, parseSchemaJson } from "./ai-sdk";
 
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 const OPENROUTER_API_URL = `${OPENROUTER_BASE_URL}/chat/completions`;
-// Must be a family with OpenRouter's *native* web-search plugin (vs the Exa
-// fallback); per the docs that's OpenAI, Anthropic, Perplexity, and xAI.
 const DEFAULT_RESEARCH_MODEL = "anthropic/claude-sonnet-5.5";
+const DEEPSEEK_RESEARCH_MODEL = "deepseek/deepseek-v4-pro-0813";
 
 function openrouterHeaders(): Record<string, string> {
 	return {
@@ -64,18 +70,34 @@ export const openrouter: Provider = {
 	async runStructuredResearch<T>({
 		prompt,
 		schema,
+		model,
 		webSearch = true,
 	}: StructuredResearchOptions<T>): Promise<StructuredResearchResult<T>> {
+		const isDeepSeek = model === "deepseek";
+		const modelVersion = isDeepSeek ? DEEPSEEK_RESEARCH_MODEL : DEFAULT_RESEARCH_MODEL;
+		const messages = [{ role: "user", content: prompt }];
+		if (isDeepSeek) {
+			// DeepSeek's first-party OpenRouter endpoint accepts JSON mode but rejects JSON Schema.
+			messages.unshift({
+				role: "system",
+				content: `Return a JSON object conforming to this JSON Schema:\n${JSON.stringify(z.toJSONSchema(schema))}`,
+			});
+		}
 		// Raw fetch: the AI SDK's OpenAI-compat path drops `tools` and `provider`.
 		const body: Record<string, unknown> = {
-			model: DEFAULT_RESEARCH_MODEL,
-			messages: [{ role: "user", content: prompt }],
-			response_format: jsonSchemaResponseFormat(schema),
+			model: modelVersion,
+			messages,
+			response_format: isDeepSeek ? { type: "json_object" } : jsonSchemaResponseFormat(schema),
 		};
+		if (isDeepSeek) body.provider = { only: ["deepseek"] };
 		if (webSearch) {
-			body.tools = [{ type: "openrouter:web_search", parameters: { engine: "native" } }];
-			// The only host with native search that enforces response_format after searching.
-			body.provider = { only: ["anthropic"] };
+			body.tools = [{ type: "openrouter:web_search", parameters: { engine: isDeepSeek ? "exa" : "native" } }];
+			if (isDeepSeek) {
+				body.max_tool_calls = RESEARCH_WEB_SEARCH_MAX_USES;
+			} else {
+				// The only host with native search that enforces response_format after searching.
+				body.provider = { only: ["anthropic"] };
+			}
 		}
 		const res = await fetch(OPENROUTER_API_URL, {
 			method: "POST",
@@ -88,12 +110,12 @@ export const openrouter: Provider = {
 		const data: any = await res.json();
 		const content = data?.choices?.[0]?.message?.content;
 		if (typeof content !== "string") {
-			throw new Error(`OpenRouter returned no JSON content (model=${DEFAULT_RESEARCH_MODEL})`);
+			throw new Error(`OpenRouter returned no JSON content (model=${modelVersion})`);
 		}
 		return {
 			object: parseSchemaJson(schema, content),
 			// The alias we sent, not the dated version OpenRouter resolved, as the other direct APIs report.
-			modelVersion: DEFAULT_RESEARCH_MODEL,
+			modelVersion,
 		};
 	},
 

@@ -18,6 +18,7 @@ export interface ProviderOptions {
 export interface StructuredResearchOptions<T> {
 	prompt: string;
 	schema: z.ZodType<T>;
+	model?: "deepseek";
 	/** Defaults to true. False for a single completion over context supplied in the prompt. */
 	webSearch?: boolean;
 }
