@@ -82,7 +82,7 @@ it("filters mentions to the selected prompt within the brand", async () => {
 	expect((await readCompetitorDiscovery(brand, otherPrompt)).businesses).toEqual([]);
 });
 
-it("applies the same multilingual identities to a single prompt and to the brand's totals", async () => {
+it("applies the same multilingual and formatting matches to a single prompt and to the brand's totals", async () => {
 	const lotusVale = await createBrand({ name: "Lotus Vale" });
 	try {
 		const first = await createPrompt(lotusVale);
@@ -94,12 +94,14 @@ it("applies the same multilingual identities to a single prompt and to the brand
 					["وادي اللوتس", 1],
 					["مطعم ميناء الياسمين Jasmine Harbor Restaurant", 1],
 					["Jasmine Harbor Restaurant", 2],
+					["Jasmine—Harbor Restaurant", 1],
 				],
 			],
 			[
 				second,
 				[
 					["وادي اللوتس (Lotus Vale)", 1],
+					["Lotus-Vale (Restaurant)", 1],
 					["Jasmine Harbor Restaurant – ميناء الياسمين", 2],
 				],
 			],
@@ -118,10 +120,10 @@ it("applies the same multilingual identities to a single prompt and to the brand
 		}
 
 		expect((await readCompetitorDiscovery(lotusVale, first)).businesses).toEqual([
-			{ name: "Jasmine Harbor Restaurant", mentions: 3, position: 2 },
+			{ name: "Jasmine Harbor Restaurant", mentions: 4, position: 2 },
 		]);
 		expect((await readCompetitorDiscovery(lotusVale)).businesses).toEqual([
-			{ name: "Jasmine Harbor Restaurant", mentions: 5, position: 2 },
+			{ name: "Jasmine Harbor Restaurant", mentions: 6, position: 2.5 },
 		]);
 	} finally {
 		await deleteBrand(lotusVale);

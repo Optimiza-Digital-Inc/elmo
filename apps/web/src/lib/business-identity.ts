@@ -15,7 +15,8 @@ function businessNameKey(name: string): string {
 		.normalize("NFKC")
 		.toLowerCase()
 		.replace(/\p{Default_Ignorable_Code_Point}/gu, "")
-		.replace(/[^\p{L}\p{M}\p{N}&+'’]+/gu, " ")
+		.replace(/(?<=\p{L})['’ʼ](?=\p{L})/gu, "")
+		.replace(/[^\p{L}\p{M}\p{N}&+]+/gu, " ")
 		.trim();
 }
 
@@ -63,11 +64,66 @@ function differentScripts(first: string, second: string): boolean {
 	return left.size > 0 && right.size > 0 && [...left].every((script) => !right.has(script));
 }
 
-function bilingualParts(name: string): string[] {
-	const divided = name.split(/\s*[|｜]\s*|\s+[–—-]\s+/u);
+function delimitedParts(name: string): [string, string][] {
+	const pairs: [string, string][] = [];
 	const parenthetical = /^(.+?)\s*[(（]([^()（）]+)[)）]\s*$/u.exec(name);
-	const pair = divided.length === 2 ? divided : parenthetical?.slice(1);
-	return pair && differentScripts(pair[0], pair[1]) ? pair.map((part) => part.trim()) : [];
+	if (parenthetical) pairs.push([parenthetical[1].trim(), parenthetical[2].trim()]);
+	for (const separator of name.matchAll(/[|｜\p{Dash_Punctuation}−]/gu)) {
+		pairs.push([name.slice(0, separator.index).trim(), name.slice(separator.index + 1).trim()]);
+	}
+	return pairs;
+}
+
+const businessTypes = new Set([
+	"bakery",
+	"barbershop",
+	"cafe",
+	"café",
+	"clinic",
+	"hotel",
+	"pharmacy",
+	"restaurant",
+	"salon",
+	"مطعم",
+	"مخبز",
+	"فندق",
+	"عيادة",
+	"صيدلية",
+	"مقهى",
+	"restaurante",
+	"ristorante",
+	"boulangerie",
+	"apotheke",
+	"ресторан",
+	"кафе",
+	"レストラン",
+	"餐厅",
+]);
+
+function bilingualParts(name: string): string[] {
+	return (
+		delimitedParts(name).find(
+			([left, right]) =>
+				!businessTypes.has(businessNameKey(left)) &&
+				!businessTypes.has(businessNameKey(right)) &&
+				differentScripts(left, right),
+		) ?? []
+	);
+}
+
+function findBase(key: string, known: Map<string, BusinessIdentity>): BusinessIdentity | undefined {
+	const firstSpace = key.indexOf(" ");
+	const lastSpace = key.lastIndexOf(" ");
+	if (firstSpace === -1) return;
+
+	const prefix = key.slice(0, firstSpace);
+	const suffix = key.slice(lastSpace + 1);
+	const bases = [
+		businessTypes.has(prefix) ? known.get(key.slice(firstSpace + 1)) : undefined,
+		businessTypes.has(suffix) ? known.get(key.slice(0, lastSpace)) : undefined,
+	].filter((identity): identity is BusinessIdentity => !!identity);
+	const [base] = bases;
+	return base && bases.every((identity) => identity.key === base.key) ? base : undefined;
 }
 
 function trackedNames(subjects: TrackedBusiness[]): Map<string, BusinessIdentity> {
@@ -144,10 +200,44 @@ function linkBilingualForms(
 	return links;
 }
 
+function linkSpacingVariants(
+	forms: BusinessForm[],
+	known: Map<string, BusinessIdentity>,
+	links: Map<string, BusinessIdentity>,
+) {
+	const candidates = new Map<string, Map<string, BusinessIdentity>>();
+	for (const { name, key } of forms) {
+		if (links.has(key)) continue;
+		const spacedKey = businessNameKey(name.replace(/(\p{Ll})(\p{Lu}\p{Ll})/gu, "$1 $2"));
+		if (key === spacedKey) continue;
+		const identity = known.get(spacedKey) ?? findBase(spacedKey, known);
+		if (!identity) continue;
+		const choices = candidates.get(key) ?? new Map<string, BusinessIdentity>();
+		choices.set(identity.key, identity);
+		candidates.set(key, choices);
+	}
+
+	const names = new Map(known);
+	for (const [key, choices] of candidates) {
+		const [identity] = choices.values();
+		if (choices.size === 1) names.set(key, identity);
+	}
+
+	return names;
+}
+
+function displayPreference(name: string): number {
+	const plain = /^[\p{L}\p{M}\p{N}&+ ]+$/u.test(name) && name === name.normalize("NFKC");
+	const mixedCase = /\p{Lu}/u.test(name) && /\p{Ll}/u.test(name);
+	return Number(plain) * 2 + Number(mixedCase);
+}
+
 export function resolveBusinessNames(names: string[], subjects: TrackedBusiness[]) {
 	const forms = names.map((name) => ({ name, key: businessNameKey(name), parts: bilingualParts(name) }));
 	const preferred = new Map(
-		[...forms].sort((a, b) => b.name.localeCompare(a.name, "en")).map(({ key, name }) => [key, name]),
+		[...forms]
+			.sort((a, b) => displayPreference(a.name) - displayPreference(b.name) || b.name.localeCompare(a.name, "en"))
+			.map(({ key, name }) => [key, name]),
 	);
 	const links = linkBilingualForms(forms, trackedNames(subjects), preferred);
 	const standalone = new Map<string, BusinessIdentity>();
@@ -156,11 +246,20 @@ export function resolveBusinessNames(names: string[], subjects: TrackedBusiness[
 			standalone.set(key, { key, name: preferred.get(key) ?? name, own: false });
 	}
 	const known = new Map([...standalone, ...links]);
+	const spellings = linkSpacingVariants(forms, known, links);
+	const formatted = new Map(spellings);
+	for (const { key } of forms) {
+		if (links.has(key)) continue;
+		const baseKey = spellings.get(key)?.key ?? key;
+		if (links.has(baseKey)) continue;
+		const base = findBase(baseKey, spellings);
+		if (base) formatted.set(key, base);
+	}
 
 	return forms.map(({ name, key, parts }) => ({
 		surface: name,
-		...(known.get(key) ??
-			(parts.length ? undefined : matchUnseparatedForm(name, known)) ?? {
+		...(formatted.get(key) ??
+			(parts.length ? undefined : matchUnseparatedForm(name, formatted)) ?? {
 				key,
 				name: preferred.get(key) ?? name,
 				own: false,
