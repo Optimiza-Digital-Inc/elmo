@@ -6,7 +6,12 @@
 import { RESEARCH_PROVIDER_PREFERENCE } from "@workspace/config/env-registry";
 import { parseScrapeTargets } from "@workspace/config/scrape-targets";
 import type { z } from "zod";
-import { getProvider, type Provider, type StructuredResearchResult } from "../providers";
+import {
+	getProvider,
+	type Provider,
+	type StructuredResearchOptions,
+	type StructuredResearchResult,
+} from "../providers";
 
 export { RESEARCH_PROVIDER_PREFERENCE };
 
@@ -66,10 +71,11 @@ export async function runStructuredResearchPrompt<T>(prompt: string, schema: z.Z
 export async function runStructuredCompletionPrompt<T>(
 	prompt: string,
 	schema: z.ZodType<T>,
+	options?: Pick<StructuredResearchOptions<T>, "disableReasoning">,
 ): Promise<StructuredResearchResult<T>> {
 	const provider = resolveResearchProvider();
 	if (!provider.runStructuredResearch) {
 		throw new Error(`Provider "${provider.id}" does not implement structured research`);
 	}
-	return provider.runStructuredResearch({ prompt, schema, webSearch: false });
+	return provider.runStructuredResearch({ prompt, schema, webSearch: false, ...options });
 }

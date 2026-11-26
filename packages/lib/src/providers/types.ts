@@ -20,6 +20,7 @@ export interface StructuredResearchOptions<T> {
 	schema: z.ZodType<T>;
 	model?: "deepseek";
 	version?: string;
+	disableReasoning?: boolean;
 	/** Defaults to true. False for a single completion over context supplied in the prompt. */
 	webSearch?: boolean;
 }

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import { discoverBusinessMentions } from "../business-mentions";
 import { resolveResearchProvider, runStructuredCompletionPrompt, runStructuredResearchPrompt } from "./llm";
 
 const ENV_KEYS = [
@@ -65,6 +66,39 @@ describe("DeepSeek research through OpenRouter", () => {
 		expect(body.tools).toEqual(
 			webSearch ? [{ type: "openrouter:web_search", parameters: { engine: "exa" } }] : undefined,
 		);
+		expect(body.reasoning).toBeUndefined();
+	});
+
+	it("extracts business names with thinking disabled and a bounded request", async () => {
+		process.env.OPENROUTER_API_KEY = "openrouter-key";
+		process.env.ONBOARDING_LLM_TARGET = `deepseek:openrouter:${flashModel}`;
+		const content = JSON.stringify({ businessNames: ["Cedar Café"] });
+		const fetchMock = vi
+			.spyOn(globalThis, "fetch")
+			.mockResolvedValue(Response.json({ choices: [{ finish_reason: "stop", message: { content } }] }));
+
+		await expect(discoverBusinessMentions("Try Cedar Café for tea.")).resolves.toEqual([
+			{ name: "Cedar Café", count: 1, position: 1 },
+		]);
+		const [, request] = fetchMock.mock.calls[0];
+		expect(request?.signal).toBeInstanceOf(AbortSignal);
+		expect(JSON.parse(String(request?.body))).toMatchObject({
+			model: flashModel,
+			provider: { only: ["deepseek"] },
+			reasoning: { effort: "none" },
+			max_tokens: expect.any(Number),
+		});
+	});
+
+	it("rejects a business extraction that stopped at the token cap", async () => {
+		process.env.OPENROUTER_API_KEY = "openrouter-key";
+		process.env.ONBOARDING_LLM_TARGET = `deepseek:openrouter:${flashModel}`;
+		const content = JSON.stringify({ businessNames: ["Cedar Café"] });
+		vi.spyOn(globalThis, "fetch").mockResolvedValue(
+			Response.json({ choices: [{ finish_reason: "length", message: { content } }] }),
+		);
+
+		await expect(discoverBusinessMentions("Try Cedar Café for tea.")).rejects.toThrow("exceeded the output limit");
 	});
 });
 

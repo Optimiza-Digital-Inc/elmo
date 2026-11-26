@@ -21,6 +21,7 @@ const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 const OPENROUTER_API_URL = `${OPENROUTER_BASE_URL}/chat/completions`;
 const DEFAULT_RESEARCH_MODEL = "anthropic/claude-sonnet-5.5";
 const DEEPSEEK_RESEARCH_MODEL = "deepseek/deepseek-v4-pro-0813";
+const DEEPSEEK_EXTRACTION_TIMEOUT_MS = 45_000;
 
 function openrouterHeaders(): Record<string, string> {
 	return {
@@ -29,6 +30,13 @@ function openrouterHeaders(): Record<string, string> {
 		"HTTP-Referer": process.env.APP_URL ?? "https://github.com/elmohq/elmo",
 		"X-Title": "Elmo AEO",
 	};
+}
+
+function researchSearchOptions(isDeepSeek: boolean): Record<string, unknown> {
+	const tools = [{ type: "openrouter:web_search", parameters: { engine: isDeepSeek ? "exa" : "native" } }];
+	if (isDeepSeek) return { tools, max_tool_calls: RESEARCH_WEB_SEARCH_MAX_USES };
+	// The only host with native search that enforces response_format after searching.
+	return { tools, provider: { only: ["anthropic"] } };
 }
 
 function extractCitationsFromOpenRouterResponse(data: any): Citation[] {
@@ -72,9 +80,11 @@ export const openrouter: Provider = {
 		schema,
 		model,
 		version,
+		disableReasoning,
 		webSearch = true,
 	}: StructuredResearchOptions<T>): Promise<StructuredResearchResult<T>> {
 		const isDeepSeek = model === "deepseek";
+		const isDeepSeekExtraction = isDeepSeek && disableReasoning === true;
 		const modelVersion = isDeepSeek ? (version ?? DEEPSEEK_RESEARCH_MODEL) : DEFAULT_RESEARCH_MODEL;
 		const messages = [{ role: "user", content: prompt }];
 		if (isDeepSeek) {
@@ -89,27 +99,28 @@ export const openrouter: Provider = {
 			model: modelVersion,
 			messages,
 			response_format: isDeepSeek ? { type: "json_object" } : jsonSchemaResponseFormat(schema),
+			...(webSearch ? researchSearchOptions(isDeepSeek) : {}),
 		};
 		if (isDeepSeek) body.provider = { only: ["deepseek"] };
-		if (webSearch) {
-			body.tools = [{ type: "openrouter:web_search", parameters: { engine: isDeepSeek ? "exa" : "native" } }];
-			if (isDeepSeek) {
-				body.max_tool_calls = RESEARCH_WEB_SEARCH_MAX_USES;
-			} else {
-				// The only host with native search that enforces response_format after searching.
-				body.provider = { only: ["anthropic"] };
-			}
+		if (isDeepSeekExtraction) {
+			body.reasoning = { effort: "none" };
+			body.max_tokens = API_PROVIDER_MAX_OUTPUT_TOKENS.openrouter;
 		}
 		const res = await fetch(OPENROUTER_API_URL, {
 			method: "POST",
 			headers: openrouterHeaders(),
 			body: JSON.stringify(body),
+			signal: isDeepSeekExtraction ? AbortSignal.timeout(DEEPSEEK_EXTRACTION_TIMEOUT_MS) : undefined,
 		});
 		if (!res.ok) {
 			throw new Error(`OpenRouter API error (${res.status}): ${await res.text()}`);
 		}
 		const data: any = await res.json();
-		const content = data?.choices?.[0]?.message?.content;
+		const choice = data?.choices?.[0];
+		if (isDeepSeekExtraction && choice?.finish_reason === "length") {
+			throw new Error(`OpenRouter business extraction exceeded the output limit (model=${modelVersion})`);
+		}
+		const content = choice?.message?.content;
 		if (typeof content !== "string") {
 			throw new Error(`OpenRouter returned no JSON content (model=${modelVersion})`);
 		}
