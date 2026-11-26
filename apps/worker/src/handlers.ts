@@ -11,6 +11,7 @@ import { REFRESH_ROLLUPS_QUEUE, ROLLUP_CATCH_UP_QUEUE } from "@workspace/lib/rol
 import type { Job, PgBoss } from "pg-boss";
 import { type AnalyzeBrandData, analyzeBrandJob, detectBrandLocationJob } from "./jobs/analyze-brand";
 import { DERIVE_RUNS_QUEUE, type DeriveRunsData, deriveRunsJob } from "./jobs/derive-runs";
+import { DISCOVER_BUSINESSES_QUEUE, discoverBusinessesJob } from "./jobs/discover-businesses";
 import { type GenerateReportData, generateReportJob } from "./jobs/generate-report";
 import { type ProcessPromptData, processPromptJob } from "./jobs/process-prompt";
 import { type RefreshRollupsData, refreshRollupsJob } from "./jobs/refresh-rollups";
@@ -144,6 +145,8 @@ export async function registerHandlers(boss: PgBoss): Promise<void> {
 		withSentry(DERIVE_RUNS_QUEUE, deriveRunsJob),
 	);
 	console.log(`Registered handler: ${DERIVE_RUNS_QUEUE}`);
+
+	await boss.work(DISCOVER_BUSINESSES_QUEUE, withSentry(DISCOVER_BUSINESSES_QUEUE, discoverBusinessesJob));
 
 	await boss.work<ReprocessData>(REPROCESS_QUEUE, { localConcurrency: 1 }, withSentry(REPROCESS_QUEUE, reprocessJob));
 	console.log(`Registered handler: ${REPROCESS_QUEUE}`);

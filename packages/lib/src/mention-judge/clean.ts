@@ -84,7 +84,7 @@ const ENTITIES: Record<string, string> = {
  * keeps the site it cites, so a brand cited only that way still reads as mentioned; other images
  * keep their caption, which can name a product.
  */
-export function cleanAnswer(answer: string): Cleaned {
+export function cleanAnswer(answer: string, { includeLinkTargets = true } = {}): Cleaned {
 	const steps: [RegExp, (...groups: string[]) => string][] = [
 		// First, since it can be most of a large answer and every later step would copy it.
 		[INLINE_DATA, () => ""],
@@ -97,7 +97,7 @@ export function cleanAnswer(answer: string): Cleaned {
 				return point > 0 && point <= 0x10ffff ? String.fromCodePoint(point) : "";
 			},
 		],
-		[/<(https?:\/\/[^\s<>]+)>/g, (_, url) => host(url)],
+		[/<(https?:\/\/[^\s<>]+)>/g, (_, url) => (includeLinkTargets ? host(url) : "")],
 		[/<\/?([a-z][a-z0-9]*)(?:\s[^<>]*)?\/?>/gi, (_, tag) => (BLOCK_TAGS.has(tag.toLowerCase()) ? " " : "")],
 		// Citation tokens some answers carry: "【4†source】" (other 【】 is ordinary CJK punctuation),
 		// ChatGPT's private-use citation markers with what they wrap, and "[^1^]".
@@ -106,13 +106,14 @@ export function cleanAnswer(answer: string): Cleaned {
 			IMAGE,
 			(_, caption, url) => {
 				const cited = /favicons\?domain=([^&]+)/.exec(url)?.[1];
-				if (cited) return `(${host(decodeURIComponent(cited))})`;
+				if (cited) return includeLinkTargets ? `(${host(decodeURIComponent(cited))})` : "";
 				return caption.trim() ? `(image: ${caption.trim()})` : "";
 			},
 		],
 		[
 			LINK,
 			(_, text, url) => {
+				if (!includeLinkTargets) return CITATION_NUMBER.test(text.trim()) ? "" : text;
 				// A relative link (shopping carousels) points at no site.
 				if (!url || url.startsWith("/")) return text;
 				// A citation chip: its text is the site, or a footnote number.
@@ -123,7 +124,7 @@ export function cleanAnswer(answer: string): Cleaned {
 		],
 		// Links the answer itself broke (a URL with spaces, text over several lines) keep their text.
 		[/\[([^\]]{0,200}?)\]\([^)\n[]{0,2000}\)/g, (_, text) => text.split(/\s+/).join(" ").trim()],
-		[/https?:\/\/[^\s)\]`'"<>]+/g, (url) => host(url)],
+		[/https?:\/\/[^\s)\]`'"<>]+/g, (url) => (includeLinkTargets ? host(url) : "")],
 		// A line can't start a sentence with a comma or a full stop, so it continues the one before (some
 		// sources split a sentence into blocks around each citation); nor can a soft-wrapped line.
 		// Each match starts at the beginning of a whitespace run, so long runs stay linear.

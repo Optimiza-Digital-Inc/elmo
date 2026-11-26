@@ -1,0 +1,3 @@
+ALTER TABLE "run_extractions" ADD COLUMN "business_mentions" jsonb;--> statement-breakpoint
+ALTER TABLE "run_extractions" ADD COLUMN "discovery_after" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX "run_extractions_pending_discovery_idx" ON "run_extractions" USING btree (coalesce("discovery_after", '-infinity'::timestamptz),"run_id") WHERE "run_extractions"."business_mentions" IS NULL AND "run_extractions"."text_content" IS NOT NULL;

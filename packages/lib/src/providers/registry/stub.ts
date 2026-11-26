@@ -6,6 +6,7 @@ import type { Provider, ScrapeResult, StructuredResearchOptions, StructuredResea
  * drift fails loudly.
  */
 const CANNED_RESEARCH = {
+	businessNames: ["Stub Brand", "Stub Competitor", "Stub Bakery"],
 	brandName: "Stub Brand",
 	country: "",
 	city: "",

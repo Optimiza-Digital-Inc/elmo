@@ -19,6 +19,7 @@ import {
 	uniqueIndex,
 	uuid,
 } from "drizzle-orm/pg-core";
+import type { BusinessMention } from "../business-mentions";
 import type { RunMentionAssessments } from "../mentions";
 import { organization } from "./schema-auth";
 
@@ -149,15 +150,25 @@ export const promptRuns = pgTable(
  * What a run's answer says, derived from `raw_output` and replaced wholesale when
  * the extractor changes (with the run's `citations`). One row per run.
  */
-export const runExtractions = pgTable("run_extractions", {
-	runId: uuid("run_id")
-		.primaryKey()
-		.references(() => promptRuns.id, { onDelete: "cascade" }),
-	/** Null when the answer had no text, or the run predates stored text. */
-	textContent: text("text_content"),
-	/** The `extraction` stamp it was derived with; null for runs that predate stamping. */
-	stamp: text("stamp"),
-}).enableRLS();
+export const runExtractions = pgTable(
+	"run_extractions",
+	{
+		runId: uuid("run_id")
+			.primaryKey()
+			.references(() => promptRuns.id, { onDelete: "cascade" }),
+		/** Null when the answer had no text, or the run predates stored text. */
+		textContent: text("text_content"),
+		businessMentions: jsonb("business_mentions").$type<BusinessMention[]>(),
+		discoveryAfter: timestamp("discovery_after", { withTimezone: true }),
+		/** The `extraction` stamp it was derived with; null for runs that predate stamping. */
+		stamp: text("stamp"),
+	},
+	(table) => [
+		index("run_extractions_pending_discovery_idx")
+			.on(sql`coalesce(${table.discoveryAfter}, '-infinity'::timestamptz)`, table.runId)
+			.where(sql`${table.businessMentions} IS NULL AND ${table.textContent} IS NOT NULL`),
+	],
+).enableRLS();
 
 /** Which tracked brands a run's answer mentions, under the brand config in `stamp`. One row per run. */
 export const runMentions = pgTable("run_mentions", {

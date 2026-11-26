@@ -33,6 +33,7 @@
 		"./run-backoff": "./src/run-backoff.ts",
 		"./text-extraction": "./src/text-extraction.ts",
 		"./onboarding": "./src/onboarding/index.ts",
+		"./business-mentions": "./src/business-mentions.ts",
 		"./mentions": "./src/mentions.ts",
 		"./analysis-versions": "./src/analysis-versions.ts",
 		"./tag-utils": "./src/tag-utils.ts",

@@ -100,7 +100,9 @@ export async function updateExtractions(
 		INSERT INTO ${runExtractions} AS e (run_id, text_content, stamp)
 		SELECT * FROM (VALUES ${sql.join(values, sql`, `)}) AS v(run_id, text_content, stamp)
 		ON CONFLICT (run_id) DO UPDATE
-		SET text_content = excluded.text_content, stamp = coalesce(excluded.stamp, e.stamp)
+		SET text_content = excluded.text_content, stamp = coalesce(excluded.stamp, e.stamp),
+			business_mentions = CASE WHEN e.text_content IS NOT DISTINCT FROM excluded.text_content THEN e.business_mentions END,
+			discovery_after = CASE WHEN e.text_content IS NOT DISTINCT FROM excluded.text_content THEN e.discovery_after END
 		${options.onlyLegacyWithoutText ? sql`WHERE e.text_content IS NULL AND (e.stamp IS NULL OR e.stamp = ${LEGACY_EXTRACTION_STAMP})` : sql``}
 	`);
 }

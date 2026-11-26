@@ -14,6 +14,7 @@ import { startBackfills } from "./backfills";
 import { getBoss } from "./boss";
 import { registerHandlers } from "./handlers";
 import { DERIVE_RUNS_QUEUE, DERIVE_RUNS_QUEUE_OPTIONS, reprocessDays, requestUnjudgedRuns } from "./jobs/derive-runs";
+import { DISCOVER_BUSINESSES_QUEUE } from "./jobs/discover-businesses";
 import {
 	adoptCurrentStamps,
 	REPROCESS_QUEUE,
@@ -110,6 +111,8 @@ async function main() {
 		expireInSeconds: 60 * 60,
 	});
 	await boss.createQueue(DERIVE_RUNS_QUEUE, DERIVE_RUNS_QUEUE_OPTIONS);
+	await boss.createQueue(DISCOVER_BUSINESSES_QUEUE, { policy: "exclusive", retryLimit: 0, expireInSeconds: 15 * 60 });
+	await boss.schedule(DISCOVER_BUSINESSES_QUEUE, "* * * * *", {}, { singletonKey: DISCOVER_BUSINESSES_QUEUE });
 	await boss.createQueue(REPROCESS_QUEUE, {
 		policy: "stately",
 		retryLimit: 2,

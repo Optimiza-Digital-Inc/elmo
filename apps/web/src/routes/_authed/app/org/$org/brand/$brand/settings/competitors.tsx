@@ -4,10 +4,11 @@ import { Alert, AlertDescription, AlertTitle } from "@workspace/ui/components/al
 import { AlertTriangle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { type CompetitorEntry, CompetitorsEditor } from "@/components/competitors-editor";
+import { CompetitorDiscovery } from "@/components/competitor-discovery";
+import { type CompetitorEntry, CompetitorsEditor, newCompetitorEntry } from "@/components/competitors-editor";
 import { UnsavedChangesBar } from "@/components/unsaved-changes-bar";
 import { useBrandId } from "@/hooks/use-brand-id";
-import { useBrand, useCompetitors } from "@/hooks/use-brands";
+import { brandKeys, useBrand, useCompetitors } from "@/hooks/use-brands";
 import { citationKeys } from "@/hooks/use-citations";
 import { dashboardKeys } from "@/hooks/use-dashboard-summary";
 import { pageHead } from "@/lib/route-head";
@@ -101,6 +102,7 @@ function CompetitorsSettingsPage() {
 			queryClient.invalidateQueries({ queryKey: citationKeys.all });
 			queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
 			await refetchCompetitors();
+			await queryClient.invalidateQueries({ queryKey: [...brandKeys.competitors(brand.id), "discovery"] });
 		} catch (err) {
 			setError(writeError(err, "Failed to save competitors."));
 		} finally {
@@ -114,6 +116,15 @@ function CompetitorsSettingsPage() {
 				<h1 className="text-3xl font-bold">Competitors</h1>
 				<p className="text-muted-foreground">Manage your competitive landscape for reputation tracking.</p>
 			</div>
+
+			<CompetitorDiscovery
+				key={brand.id}
+				brandId={brand.id}
+				competitors={competitors}
+				isSaving={isSaving}
+				onAdd={(name) => setCompetitors((current) => [...current, newCompetitorEntry({ name })])}
+			/>
+			<h2 className="text-xl font-semibold">Tracked Competitors</h2>
 
 			<Alert variant="default" className="border-yellow-200 bg-yellow-50 text-yellow-800">
 				<AlertTriangle className="h-4 w-4 text-yellow-600" />
