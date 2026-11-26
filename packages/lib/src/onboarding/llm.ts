@@ -36,7 +36,8 @@ export function resolveResearchProvider(env: Record<string, string | undefined> 
 		if (parsed.provider === "openrouter" && parsed.model === "deepseek") {
 			return {
 				...provider,
-				runStructuredResearch: (options) => runStructuredResearch({ ...options, model: "deepseek" }),
+				runStructuredResearch: (options) =>
+					runStructuredResearch({ ...options, model: "deepseek", version: parsed.version }),
 			};
 		}
 		return provider;

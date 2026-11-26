@@ -71,10 +71,11 @@ export const openrouter: Provider = {
 		prompt,
 		schema,
 		model,
+		version,
 		webSearch = true,
 	}: StructuredResearchOptions<T>): Promise<StructuredResearchResult<T>> {
 		const isDeepSeek = model === "deepseek";
-		const modelVersion = isDeepSeek ? DEEPSEEK_RESEARCH_MODEL : DEFAULT_RESEARCH_MODEL;
+		const modelVersion = isDeepSeek ? (version ?? DEEPSEEK_RESEARCH_MODEL) : DEFAULT_RESEARCH_MODEL;
 		const messages = [{ role: "user", content: prompt }];
 		if (isDeepSeek) {
 			// DeepSeek's first-party OpenRouter endpoint accepts JSON mode but rejects JSON Schema.

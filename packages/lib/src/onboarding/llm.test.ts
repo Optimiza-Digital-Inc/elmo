@@ -33,10 +33,16 @@ afterEach(() => {
 });
 
 describe("DeepSeek research through OpenRouter", () => {
-	it.each([true, false])("restricts inference to DeepSeek with web search set to %s", async (webSearch) => {
+	const flashModel = "deepseek/deepseek-v4.1-flash-1017";
+	it.each([
+		{ version: undefined, webSearch: true },
+		{ version: undefined, webSearch: false },
+		{ version: flashModel, webSearch: true },
+		{ version: flashModel, webSearch: false },
+	])("routes $version to DeepSeek with web search $webSearch", async ({ version, webSearch }) => {
 		process.env.OPENAI_API_KEY = "openai-key";
 		process.env.OPENROUTER_API_KEY = "openrouter-key";
-		process.env.ONBOARDING_LLM_TARGET = "deepseek:openrouter";
+		process.env.ONBOARDING_LLM_TARGET = version ? `deepseek:openrouter:${version}` : "deepseek:openrouter";
 		const answer = { name: "Acme" };
 		const fetchMock = vi
 			.spyOn(globalThis, "fetch")
@@ -52,7 +58,7 @@ describe("DeepSeek research through OpenRouter", () => {
 		expect(url).toBe("https://openrouter.ai/api/v1/chat/completions");
 		const body = JSON.parse(String(request?.body));
 		expect(body).toMatchObject({
-			model: "deepseek/deepseek-v4-pro-0813",
+			model: version ?? "deepseek/deepseek-v4-pro-0813",
 			provider: { only: ["deepseek"] },
 			response_format: { type: "json_object" },
 		});
