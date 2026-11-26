@@ -132,8 +132,7 @@ export function CompetitorsEditor({ competitors, onChange, disabled }: Competito
 											render={<IconInfoCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />}
 										/>
 										<TooltipContent className="max-w-xs text-xs font-normal">
-											The primary name used to detect this competitor in AI responses. Mention detection applies to{" "}
-											<strong>future</strong> prompt runs only.
+											The primary name used to detect this competitor in AI responses.
 										</TooltipContent>
 									</Tooltip>
 								</Label>
@@ -189,8 +188,8 @@ export function CompetitorsEditor({ competitors, onChange, disabled }: Competito
 											render={<IconInfoCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />}
 										/>
 										<TooltipContent className="max-w-xs text-xs font-normal">
-											Alternative names for this competitor (sub-brands, product names, abbreviations). Used for mention
-											detection in <strong>future</strong> prompt runs only &mdash; does not apply retroactively.
+											Alternative names used to detect this competitor in AI responses, such as product names and
+											abbreviations.
 										</TooltipContent>
 									</Tooltip>
 								</Label>

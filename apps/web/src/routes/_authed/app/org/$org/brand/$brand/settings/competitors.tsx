@@ -1,16 +1,17 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Alert, AlertDescription, AlertTitle } from "@workspace/ui/components/alert";
-import { AlertTriangle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { CompetitorDiscovery } from "@/components/competitor-discovery";
 import { type CompetitorEntry, CompetitorsEditor, newCompetitorEntry } from "@/components/competitors-editor";
 import { UnsavedChangesBar } from "@/components/unsaved-changes-bar";
+import { batchChartKeys } from "@/hooks/use-batch-chart-data";
 import { useBrandId } from "@/hooks/use-brand-id";
 import { brandKeys, useBrand, useCompetitors } from "@/hooks/use-brands";
 import { citationKeys } from "@/hooks/use-citations";
 import { dashboardKeys } from "@/hooks/use-dashboard-summary";
+import { promptRunsKeys } from "@/hooks/use-prompt-runs-only";
+import { promptStatsKeys } from "@/hooks/use-prompt-stats";
 import { pageHead } from "@/lib/route-head";
 import { useWriteErrorMessage } from "@/lib/write-errors";
 import { updateCompetitors } from "@/server/brands";
@@ -101,6 +102,9 @@ function CompetitorsSettingsPage() {
 
 			queryClient.invalidateQueries({ queryKey: citationKeys.all });
 			queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
+			queryClient.invalidateQueries({ queryKey: batchChartKeys.brand(brand.id) });
+			queryClient.invalidateQueries({ queryKey: promptStatsKeys.all });
+			queryClient.invalidateQueries({ queryKey: promptRunsKeys.all });
 			await refetchCompetitors();
 			await queryClient.invalidateQueries({ queryKey: [...brandKeys.competitors(brand.id), "discovery"] });
 		} catch (err) {
@@ -122,18 +126,13 @@ function CompetitorsSettingsPage() {
 				brandId={brand.id}
 				competitors={competitors}
 				isSaving={isSaving}
-				onAdd={(name) => setCompetitors((current) => [...current, newCompetitorEntry({ name })])}
+				onAdd={(name, aliases) => setCompetitors((current) => [...current, newCompetitorEntry({ name, aliases })])}
 			/>
 			<h2 className="text-xl font-semibold">Tracked Competitors</h2>
 
-			<Alert variant="default" className="border-yellow-200 bg-yellow-50 text-yellow-800">
-				<AlertTriangle className="h-4 w-4 text-yellow-600" />
-				<AlertTitle>Warning</AlertTitle>
-				<AlertDescription className="text-yellow-700">
-					Updating competitors will only apply to future prompt evaluations. Citation categorization updates
-					retroactively.
-				</AlertDescription>
-			</Alert>
+			<p className="text-sm text-muted-foreground">
+				Saving competitors updates visibility for previously collected responses in the background.
+			</p>
 
 			<CompetitorsEditor competitors={competitors} onChange={setCompetitors} disabled={isSaving} />
 

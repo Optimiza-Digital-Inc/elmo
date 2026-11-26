@@ -2,7 +2,9 @@
  * `brandScopeCondition`. */
 import { db } from "@workspace/lib/db/db";
 import { competitors } from "@workspace/lib/db/schema";
+import { REPROCESS_QUEUE, type ReprocessData } from "@workspace/lib/queues/reprocess-jobs";
 import { and, count, desc, eq, type SQL } from "drizzle-orm";
+import { getBoss } from "@/lib/boss-client";
 
 const COMPETITOR_COLUMNS = {
 	id: competitors.id,
@@ -59,4 +61,15 @@ export async function listCompetitors(
 	const data = await query;
 
 	return { data, total: totals?.count ?? 0 };
+}
+
+export async function queueCompetitorHistory(brandId: string): Promise<void> {
+	try {
+		const boss = await getBoss();
+		const data: ReprocessData = { brandId, layers: ["interpretation"] };
+		await boss.send(REPROCESS_QUEUE, data, { singletonKey: brandId });
+	} catch (error) {
+		// The worker's recurring reprocess scan also picks up a changed competitor list.
+		console.error("Could not queue competitor history", error);
+	}
 }

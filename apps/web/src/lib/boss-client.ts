@@ -1,6 +1,7 @@
 import { DETECT_BRAND_LOCATION_JOB_OPTIONS, DETECT_BRAND_LOCATION_QUEUE } from "@workspace/lib/onboarding";
 import { PROCESS_PROMPT_QUEUE, PROMPT_JOB_OPTIONS } from "@workspace/lib/queues/prompt-jobs";
 import { GENERATE_REPORT_QUEUE, REPORT_JOB_OPTIONS } from "@workspace/lib/queues/report-jobs";
+import { REPROCESS_QUEUE, REPROCESS_QUEUE_OPTIONS } from "@workspace/lib/queues/reprocess-jobs";
 import { PgBoss } from "pg-boss";
 
 let bossInstance: PgBoss | null = null;
@@ -37,6 +38,7 @@ export async function getBoss(): Promise<PgBoss> {
 		// Create queues if they don't exist (required in pg-boss v12)
 		// createQueue is idempotent - safe to call multiple times
 		await boss.createQueue(PROCESS_PROMPT_QUEUE, PROMPT_JOB_OPTIONS);
+		await boss.createQueue(REPROCESS_QUEUE, REPROCESS_QUEUE_OPTIONS);
 		await boss.createQueue(GENERATE_REPORT_QUEUE, REPORT_JOB_OPTIONS);
 		await boss.createQueue("analyze-brand", {
 			retryLimit: 1,

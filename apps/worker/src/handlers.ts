@@ -7,6 +7,7 @@ import {
 } from "@workspace/lib/onboarding";
 import { PROCESS_PROMPT_QUEUE } from "@workspace/lib/queues/prompt-jobs";
 import { GENERATE_REPORT_QUEUE } from "@workspace/lib/queues/report-jobs";
+import { REPROCESS_QUEUE, type ReprocessData } from "@workspace/lib/queues/reprocess-jobs";
 import { REFRESH_ROLLUPS_QUEUE, ROLLUP_CATCH_UP_QUEUE } from "@workspace/lib/rollups/constants";
 import type { Job, PgBoss } from "pg-boss";
 import { type AnalyzeBrandData, analyzeBrandJob, detectBrandLocationJob } from "./jobs/analyze-brand";
@@ -15,13 +16,7 @@ import { DISCOVER_BUSINESSES_QUEUE, discoverBusinessesJob } from "./jobs/discove
 import { type GenerateReportData, generateReportJob } from "./jobs/generate-report";
 import { type ProcessPromptData, processPromptJob } from "./jobs/process-prompt";
 import { type RefreshRollupsData, refreshRollupsJob } from "./jobs/refresh-rollups";
-import {
-	REPROCESS_QUEUE,
-	REQUEST_REPROCESSES_QUEUE,
-	type ReprocessData,
-	reprocessJob,
-	requestReprocessesJob,
-} from "./jobs/reprocess";
+import { REQUEST_REPROCESSES_QUEUE, reprocessJob, requestReprocessesJob } from "./jobs/reprocess";
 import { type RollupCatchUpData, rollupCatchUpJob } from "./jobs/rollup-catch-up";
 import { MAINTENANCE_CRON, type ScheduleMaintenanceData, scheduleMaintenanceJob } from "./jobs/schedule-maintenance";
 import { type SuggestPromptsData, type SuggestPromptsResult, suggestPromptsJob } from "./jobs/suggest-prompts";

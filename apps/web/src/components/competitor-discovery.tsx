@@ -10,7 +10,7 @@ interface Props {
 	brandId: string;
 	competitors: CompetitorEntry[];
 	isSaving: boolean;
-	onAdd: (name: string) => void;
+	onAdd: (name: string, aliases: string[]) => void;
 }
 
 export function CompetitorDiscovery({ brandId, competitors, isSaving, onAdd }: Props) {
@@ -147,7 +147,7 @@ function DiscoveryTable({
 											size="sm"
 											variant="outline"
 											disabled={isSaving || competitors.length >= MAX_COMPETITORS}
-											onClick={() => onAdd(row.name)}
+											onClick={() => onAdd(row.name, row.aliases)}
 											aria-label={`Add ${row.name} to competitors`}
 										>
 											Add

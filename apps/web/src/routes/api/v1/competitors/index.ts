@@ -16,7 +16,7 @@ import { offsetOf, paginationOf, paging } from "@/lib/api/query";
 import { competitorSchema, competitorsListSchema } from "@/lib/api/schemas/competitors";
 import { brandScopeCondition, requireBrandInScope } from "@/lib/api/scope";
 import { normalizeProfileLinks, ownedDomainInputsSchema, profileLinksSchema } from "@/lib/business-links";
-import { listCompetitors, toCompetitorSummary } from "@/server/competitors-core";
+import { listCompetitors, queueCompetitorHistory, toCompetitorSummary } from "@/server/competitors-core";
 
 const createCompetitorBody = z.object({
 	brandId: z.string().trim().min(1, "brandId is required"),
@@ -64,7 +64,7 @@ export const Route = createFileRoute("/api/v1/competitors/")({
 
 					// Check and insert under one lock: otherwise two requests on a
 					// brand's last competitor slot both pass the check.
-					return await withQuotaLock(brand.organizationId, async (tx) => {
+					const created = await withQuotaLock(brand.organizationId, async (tx) => {
 						await assertCompetitorCap(brandId, 1, tx);
 
 						const [inserted] = await tx
@@ -80,6 +80,8 @@ export const Route = createFileRoute("/api/v1/competitors/")({
 
 						return toCompetitorSummary(inserted);
 					});
+					await queueCompetitorHistory(brandId);
+					return created;
 				},
 			}),
 		}),

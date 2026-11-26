@@ -13,23 +13,20 @@ import {
 	organization,
 	promptRuns,
 	prompts,
+	rollupCompetitorMentions,
 	runExtractions,
 	runMentions,
 } from "@workspace/lib/db/schema";
 import { jevAnalyzer, stubTransport } from "@workspace/lib/mention-judge";
 import { mentionConfigFrom } from "@workspace/lib/mentions";
+import { REPROCESS_QUEUE, type ReprocessData } from "@workspace/lib/queues/reprocess-jobs";
 import { asc, eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cuedAnalyzer } from "../mention-judge/__fixtures__/cued-judge";
 import { deriveQueue } from "./__fixtures__/derive-queue";
 import { fillLegacyText } from "./fill-legacy-text";
-import {
-	adoptCurrentStamps,
-	REPROCESS_QUEUE,
-	type ReprocessData,
-	requestStaleReprocesses,
-	runReprocess,
-} from "./reprocess";
+import { runRefreshTick } from "./refresh-rollups";
+import { adoptCurrentStamps, requestStaleReprocesses, runReprocess } from "./reprocess";
 
 const openAiPayload = (text: string, url = "https://example.com/a") => ({
 	output: [
@@ -216,6 +213,26 @@ describe("runReprocess", () => {
 		expect((await runsInWalkOrder())[0].competitorsMentioned).toEqual(["Globex"]);
 		const [brand] = await db.select().from(brands).where(eq(brands.id, brandId));
 		expect(brand.analysisVersions).toMatchObject(await currentVersions(brandId));
+	});
+
+	it("updates visibility for a newly tracked competitor using the same saved response", async () => {
+		const run = legacyRun("Acme recommends Maple-Bakery.", new Date());
+		await insertLegacyRuns([run]);
+		await replay({ brandId, layers: BOTH_LAYERS }, 90);
+		await runRefreshTick({}, db);
+		const visibility = () =>
+			db
+				.select({ name: rollupCompetitorMentions.competitorName, runs: rollupCompetitorMentions.runs })
+				.from(rollupCompetitorMentions)
+				.where(eq(rollupCompetitorMentions.promptId, promptId));
+		expect(await visibility()).toEqual([]);
+
+		await db.insert(competitors).values({ brandId, name: "Maple Bakery", aliases: ["Maple-Bakery"] });
+		await replay({ brandId, layers: ["interpretation"] }, 90);
+		await runRefreshTick({}, db);
+
+		expect((await runsInWalkOrder()).map(({ id }) => id)).toEqual([run.id]);
+		expect(await visibility()).toEqual([{ name: "Maple Bakery", runs: 1 }]);
 	});
 
 	it("queues the last 30 days ahead of older history", async () => {

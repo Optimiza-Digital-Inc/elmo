@@ -17,7 +17,7 @@ import { ApiError, createApiHandler, withMethodGuard } from "@/lib/api/handler";
 import { competitorSchema } from "@/lib/api/schemas/competitors";
 import { isBrandInScope } from "@/lib/api/scope";
 import { normalizeProfileLinks, ownedDomainInputsSchema, profileLinksSchema } from "@/lib/business-links";
-import { toCompetitorSummary } from "@/server/competitors-core";
+import { queueCompetitorHistory, toCompetitorSummary } from "@/server/competitors-core";
 
 const competitorParams = z.object({ competitorId: z.uuid("Invalid competitor ID format") });
 
@@ -90,6 +90,9 @@ export const Route = createFileRoute("/api/v1/competitors/$competitorId")({
 					if (!updated) {
 						throw new ApiError(404, "Not Found", `Competitor with ID '${competitorId}' not found`);
 					}
+					if (body.name !== undefined || body.aliases !== undefined || body.domains !== undefined) {
+						await queueCompetitorHistory(updated.brandId);
+					}
 					return toCompetitorSummary(updated);
 				},
 			}),
@@ -104,6 +107,7 @@ export const Route = createFileRoute("/api/v1/competitors/$competitorId")({
 					if (!deleted) {
 						throw new ApiError(404, "Not Found", `Competitor with ID '${params.competitorId}' not found`);
 					}
+					await queueCompetitorHistory(deleted.brandId);
 					return toCompetitorSummary(deleted);
 				},
 			}),

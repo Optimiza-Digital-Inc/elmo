@@ -17,6 +17,7 @@ import {
 	rollupPromptRuns,
 	rollupSentimentQuotes,
 } from "@workspace/lib/db/schema";
+import type { ReprocessData } from "@workspace/lib/queues/reprocess-jobs";
 import {
 	BUCKET_MS,
 	markDirty,
@@ -29,7 +30,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { deriveQueue } from "./jobs/__fixtures__/derive-queue";
 import { refreshRollupsJob, runRefreshTick } from "./jobs/refresh-rollups";
-import { type ReprocessData, runReprocess } from "./jobs/reprocess";
+import { runReprocess } from "./jobs/reprocess";
 import { runRollupCatchUp } from "./jobs/rollup-catch-up";
 import { cuedAnalyzer } from "./mention-judge/__fixtures__/cued-judge";
 import { initializePipeline } from "./rollups-startup";

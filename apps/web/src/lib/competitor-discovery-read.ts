@@ -52,5 +52,21 @@ export async function readCompetitorDiscovery(brandId: string, promptId?: string
 		SELECT min(name) AS name, sum(mentions)::float8 AS mentions, avg(position)::float8 AS position
 		FROM per_answer GROUP BY key ORDER BY mentions DESC, position ASC, name
 	`);
-	return { prompts: coverage, businesses: result.rows };
+	const aliases = new Map<string, Map<string, string>>();
+	for (const { surface, name, own } of names) {
+		const key = surface.toLowerCase();
+		if (own || key === name.toLowerCase()) continue;
+		const variants = aliases.get(name) ?? new Map<string, string>();
+		variants.set(key, surface);
+		aliases.set(name, variants);
+	}
+	return {
+		prompts: coverage,
+		businesses: result.rows.map((row) => ({
+			...row,
+			aliases: [...(aliases.get(row.name)?.values() ?? [])]
+				.sort((a, b) => a.length - b.length || a.localeCompare(b))
+				.slice(0, 10),
+		})),
+	};
 }

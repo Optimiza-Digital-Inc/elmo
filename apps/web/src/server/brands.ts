@@ -40,6 +40,7 @@ import { normalizeBrandUpdate } from "@/lib/brand-settings";
 import { cleanOwnedDomain, normalizeProfileLinks, profileLinksSchema } from "@/lib/business-links";
 import type { TrackedTarget } from "@/lib/model-filter";
 import { INVALID_SLUG, TAKEN_SLUG } from "@/lib/slug-errors";
+import { queueCompetitorHistory } from "./competitors-core";
 
 /**
  * Targets rather than model ids: a model can appear twice, since scraped and
@@ -392,7 +393,7 @@ export const updateCompetitors = createServerFn({ method: "POST" })
 			};
 		});
 
-		return db.transaction(async (tx) => {
+		const updated = await db.transaction(async (tx) => {
 			await tx.delete(competitors).where(eq(competitors.brandId, data.brandId));
 
 			if (cleanedCompetitors.length > 0) {
@@ -408,6 +409,8 @@ export const updateCompetitors = createServerFn({ method: "POST" })
 				where: eq(competitors.brandId, data.brandId),
 			});
 		});
+		await queueCompetitorHistory(data.brandId);
+		return updated;
 	});
 
 export const addDomainToBrandFn = createServerFn({ method: "POST" })
@@ -468,6 +471,7 @@ export const addDomainToCompetitorFn = createServerFn({ method: "POST" })
 			.where(eq(competitors.id, data.competitorId))
 			.returning();
 
+		if (result) await queueCompetitorHistory(data.brandId);
 		return result;
 	});
 
@@ -488,7 +492,7 @@ export const createCompetitorFromDomainFn = createServerFn({ method: "POST" })
 
 		// Check and insert under one lock: otherwise two requests on a brand's
 		// last competitor slot both pass the check.
-		return await withQuotaLock(org.id, async (tx) => {
+		const created = await withQuotaLock(org.id, async (tx) => {
 			await assertCompetitorCap(data.brandId, 1, tx);
 
 			const [result] = await tx
@@ -502,4 +506,6 @@ export const createCompetitorFromDomainFn = createServerFn({ method: "POST" })
 
 			return result;
 		});
+		await queueCompetitorHistory(data.brandId);
+		return created;
 	});

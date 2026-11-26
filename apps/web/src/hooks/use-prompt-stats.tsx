@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { LookbackPeriod } from "@/lib/lookback";
 import { getPromptStatsFn } from "@/server/prompts";
 
-const promptStatsKeys = {
+export const promptStatsKeys = {
 	all: ["prompt-stats"] as const,
 	detail: (promptId: string, lookback: LookbackPeriod) => [...promptStatsKeys.all, promptId, lookback] as const,
 };
@@ -16,6 +16,7 @@ export function usePromptStats(promptId?: string, options?: { lookback?: Lookbac
 		enabled: !!promptId,
 		staleTime: 30_000,
 		refetchOnWindowFocus: true,
+		refetchInterval: 60_000,
 		placeholderData: (prev) => prev,
 	});
 

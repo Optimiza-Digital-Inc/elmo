@@ -7,6 +7,7 @@ import { DETECT_BRAND_LOCATION_JOB_OPTIONS, DETECT_BRAND_LOCATION_QUEUE } from "
 import { getProvider, validateScrapeTargets } from "@workspace/lib/providers";
 import { PROCESS_PROMPT_QUEUE, PROMPT_JOB_OPTIONS } from "@workspace/lib/queues/prompt-jobs";
 import { GENERATE_REPORT_QUEUE, REPORT_JOB_OPTIONS } from "@workspace/lib/queues/report-jobs";
+import { REPROCESS_QUEUE, REPROCESS_QUEUE_OPTIONS } from "@workspace/lib/queues/reprocess-jobs";
 import { REFRESH_ROLLUPS_QUEUE, ROLLUP_CATCH_UP_QUEUE } from "@workspace/lib/rollups/constants";
 import { startCredentialRefresh } from "@workspace/lib/secrets";
 import type { PgBoss } from "pg-boss";
@@ -15,12 +16,7 @@ import { getBoss } from "./boss";
 import { registerHandlers } from "./handlers";
 import { DERIVE_RUNS_QUEUE, DERIVE_RUNS_QUEUE_OPTIONS, reprocessDays, requestUnjudgedRuns } from "./jobs/derive-runs";
 import { DISCOVER_BUSINESSES_QUEUE } from "./jobs/discover-businesses";
-import {
-	adoptCurrentStamps,
-	REPROCESS_QUEUE,
-	REQUEST_REPROCESSES_QUEUE,
-	requestStaleReprocesses,
-} from "./jobs/reprocess";
+import { adoptCurrentStamps, REQUEST_REPROCESSES_QUEUE, requestStaleReprocesses } from "./jobs/reprocess";
 import { MAINTENANCE_CRON } from "./jobs/schedule-maintenance";
 import { configureMentionAnalyzer, mentionAnalyzer } from "./mention-judge";
 import { initializePipeline } from "./rollups-startup";
@@ -113,13 +109,7 @@ async function main() {
 	await boss.createQueue(DERIVE_RUNS_QUEUE, DERIVE_RUNS_QUEUE_OPTIONS);
 	await boss.createQueue(DISCOVER_BUSINESSES_QUEUE, { policy: "exclusive", retryLimit: 0, expireInSeconds: 15 * 60 });
 	await boss.schedule(DISCOVER_BUSINESSES_QUEUE, "* * * * *", {}, { singletonKey: DISCOVER_BUSINESSES_QUEUE });
-	await boss.createQueue(REPROCESS_QUEUE, {
-		policy: "stately",
-		retryLimit: 2,
-		retryDelay: 60,
-		retryBackoff: true,
-		expireInSeconds: 60 * 10,
-	});
+	await boss.createQueue(REPROCESS_QUEUE, REPROCESS_QUEUE_OPTIONS);
 	await boss.createQueue(REQUEST_REPROCESSES_QUEUE, {
 		retryLimit: 0,
 		expireInSeconds: 60 * 2,

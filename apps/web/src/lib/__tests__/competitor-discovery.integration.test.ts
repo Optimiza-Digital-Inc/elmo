@@ -66,7 +66,9 @@ afterAll(async () => {
 
 it("ranks total occurrences across all prompts and averages one position per answer", async () => {
 	const result = await readCompetitorDiscovery(brand);
-	expect(result.businesses.map((r) => ({ ...r, name: r.name.toLowerCase() }))).toEqual([
+	expect(
+		result.businesses.map((r) => ({ name: r.name.toLowerCase(), mentions: r.mentions, position: r.position })),
+	).toEqual([
 		{ name: "elm", mentions: 6, position: 2 },
 		{ name: "oak bakery", mentions: 4, position: 2 },
 	]);
@@ -76,8 +78,8 @@ it("ranks total occurrences across all prompts and averages one position per ans
 
 it("filters mentions to the selected prompt within the brand", async () => {
 	expect((await readCompetitorDiscovery(brand, localPrompt)).businesses).toEqual([
-		{ name: "Oak Bakery", mentions: 4, position: 2 },
-		{ name: "Elm", mentions: 3, position: 2.5 },
+		{ name: "Oak Bakery", mentions: 4, position: 2, aliases: ["Oak"] },
+		{ name: "Elm", mentions: 3, position: 2.5, aliases: [] },
 	]);
 	expect((await readCompetitorDiscovery(brand, otherPrompt)).businesses).toEqual([]);
 });
@@ -119,11 +121,11 @@ it("applies the same multilingual and formatting matches to a single prompt and 
 				.where(eq(runExtractions.runId, run.id));
 		}
 
-		expect((await readCompetitorDiscovery(lotusVale, first)).businesses).toEqual([
-			{ name: "Jasmine Harbor Restaurant", mentions: 4, position: 2 },
-		]);
+		const [suggestion] = (await readCompetitorDiscovery(lotusVale, first)).businesses;
+		expect(suggestion).toMatchObject({ name: "Jasmine Harbor Restaurant", mentions: 4, position: 2 });
+		expect(suggestion.aliases).toContain("Jasmine—Harbor Restaurant");
 		expect((await readCompetitorDiscovery(lotusVale)).businesses).toEqual([
-			{ name: "Jasmine Harbor Restaurant", mentions: 6, position: 2.5 },
+			expect.objectContaining({ name: "Jasmine Harbor Restaurant", mentions: 6, position: 2.5 }),
 		]);
 	} finally {
 		await deleteBrand(lotusVale);

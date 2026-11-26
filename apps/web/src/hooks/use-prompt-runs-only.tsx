@@ -11,7 +11,7 @@ interface PromptRunsOptions {
 	sort: ResponseSort;
 }
 
-const promptRunsKeys = {
+export const promptRunsKeys = {
 	all: ["prompt-runs"] as const,
 	list: (promptId: string, options: PromptRunsOptions) => [...promptRunsKeys.all, promptId, options] as const,
 };
@@ -31,6 +31,7 @@ export function usePromptRunsOnly(promptId?: string, options?: Partial<PromptRun
 		enabled: !!promptId,
 		staleTime: 30_000,
 		refetchOnWindowFocus: true,
+		refetchInterval: 60_000,
 		placeholderData: (prev) => prev,
 	});
 

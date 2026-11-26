@@ -10,13 +10,16 @@ export interface BatchChartDataFilters {
 	search?: string;
 }
 
+export const batchChartKeys = {
+	brand: (brandId: string | undefined) => ["batch-chart-data", brandId] as const,
+};
+
 export function useBatchChartData(brandId?: string, filters?: BatchChartDataFilters) {
 	const resolvedBrandId = useResolvedBrandId(brandId);
 
 	const query = useQuery({
 		queryKey: [
-			"batch-chart-data",
-			resolvedBrandId,
+			...batchChartKeys.brand(resolvedBrandId),
 			filters?.lookback,
 			filters?.model,
 			filters?.tags?.join(","),
@@ -35,7 +38,8 @@ export function useBatchChartData(brandId?: string, filters?: BatchChartDataFilt
 			}),
 		enabled: !!resolvedBrandId,
 		staleTime: 60_000,
-		refetchOnWindowFocus: false,
+		refetchOnWindowFocus: true,
+		refetchInterval: 60_000,
 		refetchOnReconnect: true,
 		placeholderData: (prev) => prev,
 	});

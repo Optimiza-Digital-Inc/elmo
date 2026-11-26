@@ -19,6 +19,7 @@ import {
 	runMentions,
 } from "@workspace/lib/db/schema";
 import { type MentionConfig, mentionConfigFrom } from "@workspace/lib/mentions";
+import { REPROCESS_QUEUE, type ReprocessData } from "@workspace/lib/queues/reprocess-jobs";
 import { computeSystemTags } from "@workspace/lib/tag-utils";
 import { and, eq, gte, inArray, isNull, lt, or, type SQL, sql } from "drizzle-orm";
 import type { Job, PgBoss } from "pg-boss";
@@ -26,14 +27,7 @@ import { getBoss } from "../boss";
 import { type MentionAnalyzer, mentionAnalyzer } from "../mention-judge";
 import { DERIVE_PRIORITY, reprocessDays, sendDeriveRuns } from "./derive-runs";
 
-export const REPROCESS_QUEUE = "reprocess";
-
-export type ReprocessLayer = "extraction" | "interpretation";
-
-export interface ReprocessData {
-	brandId: string;
-	layers: ReprocessLayer[];
-}
+type ReprocessLayer = ReprocessData["layers"][number];
 
 const LAYER_KEY: Record<ReprocessLayer, string> = { extraction: EXTRACTION_KEY, interpretation: MENTIONS_KEY };
 
